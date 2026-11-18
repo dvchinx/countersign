@@ -12,6 +12,7 @@
 <p align="center">
   <img alt="Estado: pre-alpha" src="https://img.shields.io/badge/estado-pre--alpha-orange">
   <img alt="Maven Central: 0.1.0 muy pronto" src="https://img.shields.io/badge/maven%20central-0.1.0%20muy%20pronto-lightgrey">
+  <a href="https://github.com/dvchinx/countersign/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/dvchinx/countersign/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Java 21" src="https://img.shields.io/badge/java-21-blue?logo=openjdk&logoColor=white">
   <img alt="Spring AI 2.0" src="https://img.shields.io/badge/spring%20ai-2.0.x-6DB33F?logo=spring&logoColor=white">
   <img alt="Licencia: Apache 2.0" src="https://img.shields.io/badge/licencia-Apache%202.0-blue">
