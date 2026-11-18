@@ -18,6 +18,8 @@
   <a href="https://github.com/dvchinx/countersign/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/dvchinx/countersign?style=social"></a>
 </p>
 
+<p align="center"><b>English</b> · <a href="README.es.md">Español</a></p>
+
 ---
 
 In law, a *countersignature* is the second signature that makes a document valid.
