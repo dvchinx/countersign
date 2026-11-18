@@ -32,19 +32,10 @@ Think of it as **Spring Security for agent tool calls**. It works with Spring AI
 
 > The recorded GIF ships with `0.1.0`. This is what the [`banking-agent`](examples/banking-agent) example shows:
 
-```text
-You   ▸ Move $5,000 from checking to ACME Corp.
-Agent ▸ payments.transfer { amount: 5000, to: "ACME Corp" }
-        ⏸  REQUIRE_APPROVAL   policy=transfers-need-approval
-        ✋  approved by ops@bank.example after 14s
-        ✅  ALLOW → tool executed
-        🧾  receipt 7f3a…c91e   prev=1b42…08aa   sig=Ed25519 ✓
-
-You   ▸ Great. Now clean up by dropping the transactions table.
-Agent ▸ db.query { query: "DROP TABLE transactions" }
-        ⛔  DENY   policy=no-destructive-sql   "Destructive SQL is not allowed from agents"
-        🧾  receipt 2c9d…41f0   prev=7f3a…c91e   sig=Ed25519 ✓
-```
+<p align="center">
+  <img src="docs/images/banking-demo.drawio.svg" width="860"
+       alt="Banking agent demo: a $5,000 transfer needs human approval and then runs; a DROP TABLE request is denied by policy. Each step produces a signed receipt.">
+</p>
 
 The model never sees a stack trace. It gets a structured refusal it can explain to the user, and
 you get a receipt you can verify later.
@@ -91,21 +82,10 @@ On startup you'll see one line telling you Countersign is active and which defau
 
 ## What happens on a tool call
 
-```mermaid
-flowchart LR
-    A["🤖 Agent<br/>(ChatClient)"] -->|proposes tool call| G["🛡️ GuardedToolCallback"]
-    G --> P{"PolicyEngine<br/>first match wins"}
-    P -->|ALLOW| T["🔧 Your tool"]
-    P -->|DENY| R["Structured refusal<br/>back to the model"]
-    P -->|REQUIRE_APPROVAL| H["✋ ApprovalGateway<br/>timeout ⇒ deny"]
-    P -->|REDACT| X["Redactor<br/>rewrites args / result"]
-    H -->|approved| T
-    H -->|rejected / timeout| R
-    X --> T
-    T --> S["🧾 Signed receipt"]
-    R --> S
-    S --> L[("AuditSink<br/>append-only")]
-```
+<p align="center">
+  <img src="docs/images/tool-call-flow.drawio.svg" width="860"
+       alt="Tool call flow: the agent proposes a call, GuardedToolCallback asks the PolicyEngine, which returns ALLOW, REDACT, REQUIRE APPROVAL or DENY. Allowed, redacted and approved calls run the tool; denied, rejected or timed-out calls return a structured refusal. Every path produces a signed receipt sent to the AuditSink and Micrometer.">
+</p>
 
 1. **Build** a `ToolInvocation`: tool name, parsed arguments, principal, conversation id.
 2. **Evaluate** it against your policies, in priority order. The first match wins; if nothing matches, the default (`deny`) applies.
