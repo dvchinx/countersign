@@ -1,0 +1,28 @@
+# Build output
+target/
+.flattened-pom.xml
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets: never commit signing keys or environment files
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks
+
+# Local Claude Code settings
+.claude/settings.local.json

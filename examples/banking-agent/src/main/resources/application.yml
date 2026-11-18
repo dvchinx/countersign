@@ -1,0 +1,3 @@
+spring:
+  application:
+    name: countersign-example-banking-agent
