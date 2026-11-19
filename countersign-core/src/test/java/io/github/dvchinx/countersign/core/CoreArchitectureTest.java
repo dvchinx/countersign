@@ -20,13 +20,14 @@ class CoreArchitectureTest {
 
     private static final String CORE = "io.github.dvchinx.countersign.core..";
 
-    // When the JSON library is chosen (ADR required), add its package here and nothing else.
+    // javax.crypto is part of the JDK (module java.base); it provides HMAC for argument hashes (ADR 0004).
+    // Any non-JDK package added here needs its own ADR.
     private static final ArchRule CORE_IS_FRAMEWORK_FREE = classes()
             .that()
             .resideInAPackage(CORE)
             .should()
             .onlyDependOnClassesThat()
-            .resideInAnyPackage("java..", "org.jspecify..", CORE)
+            .resideInAnyPackage("java..", "javax.crypto..", "org.jspecify..", CORE)
             .because("countersign-core must not depend on Spring, Spring AI or any other framework");
 
     @Test

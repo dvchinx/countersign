@@ -93,7 +93,7 @@ On startup you'll see one line telling you Countersign is active and which defau
 1. **Build** a `ToolInvocation`: tool name, parsed arguments, principal, conversation id.
 2. **Evaluate** it against your policies, in priority order. The first match wins; if nothing matches, the default (`deny`) applies.
 3. **Apply** the decision: run the tool, refuse it, ask a human, or redact it.
-4. **Record** a receipt: the decision, the matched policies, a SHA-256 of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
+4. **Record** a receipt: the decision, the matched policies, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
 5. **Publish** it to your `AuditSink`, along with Micrometer metrics and observations.
 
 Enforcement happens **where the tool runs**, not in the list of tools sent to the model. A tool the
@@ -124,7 +124,7 @@ content filter, not instead of one.
 - **Human in the loop:** a pluggable `ApprovalGateway`. The default denies when approval times out.
 - **Tamper-evident receipts:** canonical JSON, a SHA-256 hash chain and Ed25519 signatures using only
   `java.security`, plus a verification utility that detects any edited or deleted receipt.
-- **Privacy by default:** receipts store a hash of the arguments. Storing raw values is opt-in and goes through a `Redactor`.
+- **Privacy by default:** receipts store a keyed hash (HMAC) of the arguments, so values cannot be recovered by guessing. Storing raw values is opt-in and goes through a `Redactor`.
 - **Audit sinks:** in-memory and PostgreSQL (append-only) out of the box.
 - **Observability:** `countersign.decisions`, `countersign.evaluation` and `countersign.audit.failures` via Micrometer.
 - **Test helpers:** `countersign-test` lets you assert in your own tests that your agent was blocked.
@@ -137,7 +137,7 @@ content filter, not instead of one.
   "sequence": 42,
   "invocationId": "3f6c2a9e-8d41-4b7a-9f0e-5c2d1b8a7e64",
   "tool": "payments.transfer",
-  "argsSha256": "9b2f4c…e71a",
+  "argsHmac": "9b2f4c…e71a",
   "decision": "REQUIRE_APPROVAL",
   "reason": "Moves real money",
   "basis": "POLICY_MATCHED",

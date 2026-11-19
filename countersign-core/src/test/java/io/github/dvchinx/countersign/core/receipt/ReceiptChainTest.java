@@ -1,5 +1,6 @@
 package io.github.dvchinx.countersign.core.receipt;
 
+import static io.github.dvchinx.countersign.core.receipt.ReceiptFixtures.ARGS_HMAC;
 import static io.github.dvchinx.countersign.core.receipt.ReceiptFixtures.CLOCK;
 import static io.github.dvchinx.countersign.core.receipt.ReceiptFixtures.KEYS;
 import static io.github.dvchinx.countersign.core.receipt.ReceiptFixtures.needsApproval;
@@ -65,12 +66,12 @@ class ReceiptChainTest {
     }
 
     @Test
-    void storesAHashOfTheArgumentsNeverTheValues() {
+    void storesAKeyedHashOfTheArgumentsNeverTheValues() {
         ToolInvocation invocation = transfer("inv-1", 987654);
 
         Receipt receipt = newChain().append(invocation, needsApproval());
 
-        assertThat(receipt.argsSha256()).isEqualTo(CanonicalJson.sha256Hex(invocation.arguments()));
+        assertThat(receipt.argsHmac()).isEqualTo(ARGS_HMAC.hex(invocation.arguments()));
         assertThat(receipt.toString()).doesNotContain("987654", "ACME");
     }
 
@@ -105,6 +106,7 @@ class ReceiptChainTest {
                     }
                     return realSigner.sign(hash);
                 },
+                ARGS_HMAC,
                 CLOCK);
         Receipt first = chain.append(transfer("inv-1", 1), needsApproval());
 
@@ -121,7 +123,7 @@ class ReceiptChainTest {
 
     @Test
     void rejectsASignerThatReturnsNoSignature() {
-        ReceiptChain chain = ReceiptChain.start("stream-1", hash -> new byte[0], CLOCK);
+        ReceiptChain chain = ReceiptChain.start("stream-1", hash -> new byte[0], ARGS_HMAC, CLOCK);
 
         assertThatThrownBy(() -> chain.append(transfer("inv-1", 1), needsApproval()))
                 .isInstanceOf(ReceiptException.class);
@@ -132,7 +134,8 @@ class ReceiptChainTest {
         ReceiptChain chain = newChain();
         Receipt first = chain.append(transfer("inv-1", 1), needsApproval());
 
-        ReceiptChain resumed = ReceiptChain.resume(first, new Ed25519ReceiptSigner(KEYS.getPrivate()), CLOCK);
+        ReceiptChain resumed =
+                ReceiptChain.resume(first, new Ed25519ReceiptSigner(KEYS.getPrivate()), ARGS_HMAC, CLOCK);
         Receipt second = resumed.append(transfer("inv-2", 2), needsApproval());
 
         assertThat(resumed.streamId()).isEqualTo("stream-1");
@@ -159,7 +162,7 @@ class ReceiptChainTest {
 
     @Test
     void rejectsABlankStreamId() {
-        assertThatThrownBy(() -> ReceiptChain.start(" ", hash -> hash, CLOCK))
+        assertThatThrownBy(() -> ReceiptChain.start(" ", hash -> hash, ARGS_HMAC, CLOCK))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

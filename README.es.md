@@ -95,7 +95,7 @@ Al arrancar verás una línea en el log que indica que Countersign está activo 
 1. **Construye** un `ToolInvocation`: nombre de la herramienta, argumentos parseados, principal e id de conversación.
 2. **Evalúa** la invocación contra tus políticas, en orden de prioridad. Gana la primera que coincide; si ninguna coincide, se aplica la decisión por defecto (`deny`).
 3. **Aplica** la decisión: ejecuta la herramienta, la rechaza, le pregunta a un humano o redacta los datos.
-4. **Registra** un recibo: la decisión, las políticas que coincidieron, un SHA-256 de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
+4. **Registra** un recibo: la decisión, las políticas que coincidieron, un hash con clave (HMAC-SHA256) de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
 5. **Publica** el recibo en tu `AuditSink`, junto con métricas y observaciones de Micrometer.
 
 El control ocurre **donde se ejecuta la herramienta**, no en la lista de herramientas que se le envía
@@ -127,7 +127,7 @@ filtro de contenido, no en lugar de uno.
 - **Humano en el ciclo:** un `ApprovalGateway` intercambiable. El que viene por defecto deniega cuando la aprobación vence.
 - **Recibos a prueba de manipulación:** JSON canónico, cadena de hashes SHA-256 y firmas Ed25519 usando solo
   `java.security`, más una utilidad de verificación que detecta cualquier recibo editado o borrado.
-- **Privacidad por defecto:** los recibos guardan un hash de los argumentos. Guardar los valores en crudo es opcional y pasa por un `Redactor`.
+- **Privacidad por defecto:** los recibos guardan un hash con clave (HMAC) de los argumentos, así que los valores no se pueden recuperar probando candidatos. Guardar los valores en crudo es opcional y pasa por un `Redactor`.
 - **Destinos de auditoría:** en memoria y PostgreSQL (solo inserción) incluidos.
 - **Observabilidad:** `countersign.decisions`, `countersign.evaluation` y `countersign.audit.failures` vía Micrometer.
 - **Utilidades de test:** `countersign-test` te permite comprobar en tus propios tests que tu agente fue bloqueado.
@@ -140,7 +140,7 @@ filtro de contenido, no en lugar de uno.
   "sequence": 42,
   "invocationId": "3f6c2a9e-8d41-4b7a-9f0e-5c2d1b8a7e64",
   "tool": "payments.transfer",
-  "argsSha256": "9b2f4c…e71a",
+  "argsHmac": "9b2f4c…e71a",
   "decision": "REQUIRE_APPROVAL",
   "reason": "Moves real money",
   "basis": "POLICY_MATCHED",

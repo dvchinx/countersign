@@ -16,12 +16,13 @@ final class ReceiptFixtures {
 
     static final KeyPair KEYS = generateKeys();
     static final KeyPair OTHER_KEYS = generateKeys();
+    static final ArgumentsHmac ARGS_HMAC = new ArgumentsHmac(new byte[32]);
     static final Clock CLOCK = Clock.fixed(Instant.parse("2026-11-18T14:02:11.482917Z"), ZoneOffset.UTC);
 
     private ReceiptFixtures() {}
 
     static ReceiptChain newChain() {
-        return ReceiptChain.start("stream-1", new Ed25519ReceiptSigner(KEYS.getPrivate()), CLOCK);
+        return ReceiptChain.start("stream-1", new Ed25519ReceiptSigner(KEYS.getPrivate()), ARGS_HMAC, CLOCK);
     }
 
     static ReceiptVerifier verifier() {

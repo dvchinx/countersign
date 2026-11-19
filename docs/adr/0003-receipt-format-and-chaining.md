@@ -1,6 +1,6 @@
 # 3. Receipt format, hash chaining and signing
 
-- Status: Accepted
+- Status: Accepted; the arguments hash is superseded by [ADR 0004](0004-keyed-hash-for-receipt-arguments.md)
 - Date: 2026-11-19
 
 ## Context

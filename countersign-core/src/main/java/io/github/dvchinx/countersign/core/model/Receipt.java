@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
  * The signed, hash-chained record of one decision: the unit of audit.
  *
  * <p>A receipt answers "what did the agent try to do, and who allowed it?" without storing the arguments
- * themselves: it keeps their SHA-256 ({@link #argsSha256()}). Each receipt includes the hash of the one before it in
+ * themselves: it keeps a keyed hash of them ({@link #argsHmac()}, ADR 0004). Each receipt includes the hash of the one before it in
  * the same stream ({@link #previousHash()}), and its own {@link #hash()} is signed with Ed25519, so editing,
  * deleting, inserting or reordering a stored receipt is detected on verification. The exact format is described in
  * ADR 0003.
@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
  * @param sequence the position in the stream, starting at 1 with no gaps
  * @param invocationId the id of the invocation this receipt records
  * @param tool the tool's name
- * @param argsSha256 SHA-256 of the canonical JSON of the arguments, lowercase hex
+ * @param argsHmac HMAC-SHA256 of the canonical JSON of the arguments, lowercase hex; see {@code ArgumentsHmac}
  * @param decision the kind of decision
  * @param reason the decision's reason, or {@code null} for {@link Decision.Type#ALLOW}
  * @param basis why the decision was reached
@@ -39,7 +39,7 @@ public record Receipt(
         long sequence,
         String invocationId,
         String tool,
-        String argsSha256,
+        String argsHmac,
         Decision.Type decision,
         @Nullable String reason,
         EvaluationResult.Basis basis,
@@ -66,7 +66,7 @@ public record Receipt(
         }
         Objects.requireNonNull(invocationId, "invocationId");
         Objects.requireNonNull(tool, "tool");
-        Objects.requireNonNull(argsSha256, "argsSha256");
+        Objects.requireNonNull(argsHmac, "argsHmac");
         Objects.requireNonNull(decision, "decision");
         Objects.requireNonNull(basis, "basis");
         matchedPolicies = List.copyOf(matchedPolicies);

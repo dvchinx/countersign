@@ -26,7 +26,7 @@ record ReceiptBody(
         long sequence,
         String invocationId,
         String tool,
-        String argsSha256,
+        String argsHmac,
         Decision.Type decision,
         @Nullable String reason,
         EvaluationResult.Basis basis,
@@ -46,7 +46,7 @@ record ReceiptBody(
                 receipt.sequence(),
                 receipt.invocationId(),
                 receipt.tool(),
-                receipt.argsSha256(),
+                receipt.argsHmac(),
                 receipt.decision(),
                 receipt.reason(),
                 receipt.basis(),
@@ -64,7 +64,7 @@ record ReceiptBody(
                 .put("sequence", JsonNumber.of(sequence))
                 .put("invocationId", invocationId)
                 .put("tool", tool)
-                .put("argsSha256", argsSha256)
+                .put("argsHmac", argsHmac)
                 .put("decision", decision.name())
                 .put("reason", nullable(reason))
                 .put("basis", basis.name())
@@ -92,7 +92,7 @@ record ReceiptBody(
                 sequence,
                 invocationId,
                 tool,
-                argsSha256,
+                argsHmac,
                 decision,
                 reason,
                 basis,

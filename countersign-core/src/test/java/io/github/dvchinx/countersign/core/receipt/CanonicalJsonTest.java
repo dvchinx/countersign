@@ -6,7 +6,10 @@ import io.github.dvchinx.countersign.core.model.JsonArray;
 import io.github.dvchinx.countersign.core.model.JsonNumber;
 import io.github.dvchinx.countersign.core.model.JsonObject;
 import io.github.dvchinx.countersign.core.model.JsonString;
+import io.github.dvchinx.countersign.core.model.JsonValue;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -77,16 +80,23 @@ class CanonicalJsonTest {
 
         assertThat(CanonicalJson.write(JsonString.of(loneHigh))).isEqualTo("\"a\\ud83d\"");
         assertThat(CanonicalJson.write(JsonString.of(loneLow))).isEqualTo("\"a\\ude00\"");
-        assertThat(CanonicalJson.sha256Hex(JsonString.of(loneHigh)))
-                .isNotEqualTo(CanonicalJson.sha256Hex(JsonString.of("a?")));
+        assertThat(utf8(JsonString.of(loneHigh))).isNotEqualTo(utf8(JsonString.of("a?")));
     }
 
     @Test
     void hashesTheUtf8OfTheCanonicalForm() {
         // Reference values from `printf '{}' | sha256sum` and `printf '{"a":1}' | sha256sum`.
-        assertThat(CanonicalJson.sha256Hex(JsonObject.empty()))
+        assertThat(sha256Hex(JsonObject.empty()))
                 .isEqualTo("44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a");
-        assertThat(CanonicalJson.sha256Hex(JsonObject.builder().put("a", 1).build()))
+        assertThat(sha256Hex(JsonObject.builder().put("a", 1).build()))
                 .isEqualTo("015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862");
+    }
+
+    private static byte[] utf8(JsonValue value) {
+        return CanonicalJson.write(value).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static String sha256Hex(JsonValue value) {
+        return HexFormat.of().formatHex(CanonicalJson.sha256(utf8(value)));
     }
 }

@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
  * {@link #resume}.
  *
  * <p>Appending is serialized with a lock, because each receipt needs the hash of the previous one. The lock covers
- * only hashing and signing; the arguments are hashed before it is taken. If signing fails, {@link #append} throws a
+ * only hashing and signing; the arguments are hashed before it is taken. If hashing or signing fails, {@link #append} throws a
  * {@link ReceiptException} and the chain does not advance, so the next receipt still links to the last good one.
  *
  * <p>Thread-safe. Uses a {@link ReentrantLock} rather than {@code synchronized} so that virtual threads waiting
@@ -34,15 +34,23 @@ public final class ReceiptChain {
 
     private final String streamId;
     private final ReceiptSigner signer;
+    private final ArgumentsHmac argumentsHmac;
     private final Clock clock;
     private final ReentrantLock lock = new ReentrantLock();
 
     private long lastSequence;
     private String lastHash;
 
-    private ReceiptChain(String streamId, ReceiptSigner signer, Clock clock, long lastSequence, String lastHash) {
+    private ReceiptChain(
+            String streamId,
+            ReceiptSigner signer,
+            ArgumentsHmac argumentsHmac,
+            Clock clock,
+            long lastSequence,
+            String lastHash) {
         this.streamId = streamId;
         this.signer = Objects.requireNonNull(signer, "signer");
+        this.argumentsHmac = Objects.requireNonNull(argumentsHmac, "argumentsHmac");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.lastSequence = lastSequence;
         this.lastHash = lastHash;
@@ -53,16 +61,17 @@ public final class ReceiptChain {
      *
      * @param streamId an id no other stream uses, for example a UUID per application instance
      * @param signer signs each receipt's hash
+     * @param argumentsHmac computes the keyed hash of the arguments stored in each receipt
      * @param clock the source of receipt timestamps
      * @return the chain
      * @throws IllegalArgumentException if {@code streamId} is blank
      */
-    public static ReceiptChain start(String streamId, ReceiptSigner signer, Clock clock) {
+    public static ReceiptChain start(String streamId, ReceiptSigner signer, ArgumentsHmac argumentsHmac, Clock clock) {
         Objects.requireNonNull(streamId, "streamId");
         if (streamId.isBlank()) {
             throw new IllegalArgumentException("streamId must not be blank");
         }
-        return new ReceiptChain(streamId, signer, clock, 0, Receipt.GENESIS_HASH);
+        return new ReceiptChain(streamId, signer, argumentsHmac, clock, 0, Receipt.GENESIS_HASH);
     }
 
     /**
@@ -73,12 +82,14 @@ public final class ReceiptChain {
      *
      * @param last the last receipt of the stream
      * @param signer signs each receipt's hash
+     * @param argumentsHmac computes the keyed hash of the arguments; use the same key as the stream's earlier
+     *     receipts, or argument hashes in one stream stop being comparable
      * @param clock the source of receipt timestamps
      * @return the chain
      */
-    public static ReceiptChain resume(Receipt last, ReceiptSigner signer, Clock clock) {
+    public static ReceiptChain resume(Receipt last, ReceiptSigner signer, ArgumentsHmac argumentsHmac, Clock clock) {
         Objects.requireNonNull(last, "last");
-        return new ReceiptChain(last.streamId(), signer, clock, last.sequence(), last.hash());
+        return new ReceiptChain(last.streamId(), signer, argumentsHmac, clock, last.sequence(), last.hash());
     }
 
     /**
@@ -87,12 +98,12 @@ public final class ReceiptChain {
      * @param invocation the invocation that was evaluated
      * @param result what the policy engine decided
      * @return the signed receipt
-     * @throws ReceiptException if signing fails; the chain does not advance and the call must be denied
+     * @throws ReceiptException if hashing or signing fails; the chain does not advance and the call must be denied
      */
     public Receipt append(ToolInvocation invocation, EvaluationResult result) {
         Objects.requireNonNull(invocation, "invocation");
         Objects.requireNonNull(result, "result");
-        String argsSha256 = CanonicalJson.sha256Hex(invocation.arguments());
+        String argsHmac = argumentsHmac.hex(invocation.arguments());
         List<String> matchedPolicies = result.policyId() == null ? List.of() : List.of(result.policyId());
 
         lock.lock();
@@ -102,7 +113,7 @@ public final class ReceiptChain {
                     lastSequence + 1,
                     invocation.id(),
                     invocation.toolName(),
-                    argsSha256,
+                    argsHmac,
                     result.decision().type(),
                     reasonOf(result.decision()),
                     result.basis(),

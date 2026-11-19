@@ -99,7 +99,10 @@ class ReceiptVerifierTest {
     void detectsAReceiptSplicedInFromAnotherStream() {
         List<Receipt> receipts = new ArrayList<>(stream(2));
         Receipt foreign = ReceiptChain.start(
-                        "stream-2", new Ed25519ReceiptSigner(ReceiptFixtures.KEYS.getPrivate()), CLOCK)
+                        "stream-2",
+                        new Ed25519ReceiptSigner(ReceiptFixtures.KEYS.getPrivate()),
+                        ReceiptFixtures.ARGS_HMAC,
+                        CLOCK)
                 .append(transfer("x", 1), needsApproval());
         receipts.add(foreign);
 

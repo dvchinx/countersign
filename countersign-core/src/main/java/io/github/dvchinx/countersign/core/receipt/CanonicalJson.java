@@ -8,7 +8,6 @@ import io.github.dvchinx.countersign.core.model.JsonObject;
 import io.github.dvchinx.countersign.core.model.JsonString;
 import io.github.dvchinx.countersign.core.model.JsonValue;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -51,16 +50,6 @@ public final class CanonicalJson {
         StringBuilder out = new StringBuilder();
         append(out, value);
         return out.toString();
-    }
-
-    /**
-     * Returns the SHA-256 of a value's canonical form, as lowercase hex. This is how receipts hash arguments.
-     *
-     * @param value the value
-     * @return 64 lowercase hex characters
-     */
-    public static String sha256Hex(JsonValue value) {
-        return HEX.formatHex(sha256(write(value).getBytes(StandardCharsets.UTF_8)));
     }
 
     static byte[] sha256(byte[] bytes) {
