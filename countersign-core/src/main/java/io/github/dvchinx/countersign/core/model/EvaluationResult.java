@@ -12,7 +12,8 @@ import org.jspecify.annotations.Nullable;
  *
  * @param decision what to do with the call
  * @param basis why this decision was reached
- * @param policyId the policy that produced the decision; {@code null} only when the default decision applied
+ * @param policyId the policy that produced the decision; {@code null} when the default decision applied or the
+ *     arguments could not be read
  */
 public record EvaluationResult(
         Decision decision, Basis basis, @Nullable String policyId) {
@@ -24,23 +25,30 @@ public record EvaluationResult(
         /** No policy matched, so the engine's default decision applies. */
         DEFAULT_DECISION,
         /** A policy's condition failed while being evaluated, so the call is denied (fail closed). */
-        EVALUATION_FAILED
+        EVALUATION_FAILED,
+        /**
+         * The tool input could not be read as a JSON object, so no policy could be evaluated and the call is denied
+         * (fail closed). The invocation is recorded with empty arguments.
+         */
+        INVALID_ARGUMENTS
     }
 
     /**
      * Creates a result, checking that the parts are consistent.
      *
      * @throws IllegalArgumentException if a policy id is missing or present where it should not be, or if a failed
-     *     evaluation does not deny
+     *     evaluation or invalid arguments do not deny
      */
     public EvaluationResult {
         Objects.requireNonNull(decision, "decision");
         Objects.requireNonNull(basis, "basis");
-        if ((basis == Basis.DEFAULT_DECISION) != (policyId == null)) {
-            throw new IllegalArgumentException("policyId is required unless the default decision applied");
+        boolean policyDecided = basis == Basis.POLICY_MATCHED || basis == Basis.EVALUATION_FAILED;
+        if (policyDecided != (policyId != null)) {
+            throw new IllegalArgumentException("policyId is required exactly when a policy decided");
         }
-        if (basis == Basis.EVALUATION_FAILED && !(decision instanceof Decision.Deny)) {
-            throw new IllegalArgumentException("a failed evaluation must deny");
+        if ((basis == Basis.EVALUATION_FAILED || basis == Basis.INVALID_ARGUMENTS)
+                && !(decision instanceof Decision.Deny)) {
+            throw new IllegalArgumentException(basis + " must deny");
         }
     }
 
@@ -76,5 +84,17 @@ public record EvaluationResult(
                 Decision.deny("The call was blocked because a policy could not be evaluated"),
                 Basis.EVALUATION_FAILED,
                 policyId);
+    }
+
+    /**
+     * The tool input could not be read; the call is denied.
+     *
+     * @return the result, always a {@link Decision.Deny}
+     */
+    public static EvaluationResult invalidArguments() {
+        return new EvaluationResult(
+                Decision.deny("The call was blocked because its arguments are not a valid JSON object"),
+                Basis.INVALID_ARGUMENTS,
+                null);
     }
 }

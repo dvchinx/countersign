@@ -41,6 +41,19 @@ class DecisionTest {
     }
 
     @Test
+    void invalidArgumentsAlwaysDenyWithoutAPolicy() {
+        EvaluationResult invalid = EvaluationResult.invalidArguments();
+
+        assertThat(invalid.decision()).isInstanceOf(Decision.Deny.class);
+        assertThat(invalid.policyId()).isNull();
+        assertThatThrownBy(() -> new EvaluationResult(Decision.allow(), EvaluationResult.Basis.INVALID_ARGUMENTS, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new EvaluationResult(
+                        Decision.deny("x"), EvaluationResult.Basis.INVALID_ARGUMENTS, "some-policy"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void invocationNeedsAToolName() {
         assertThatThrownBy(() -> ToolInvocation.of(" ", JsonObject.empty()))
                 .isInstanceOf(IllegalArgumentException.class);
