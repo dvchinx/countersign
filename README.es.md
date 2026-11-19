@@ -136,15 +136,21 @@ filtro de contenido, no en lugar de uno.
 
 ```json
 {
-  "invocationId": "01JD6Y3Q8M7K4T2V9X0B5N1C3R",
+  "streamId": "banking-agent-7c1e",
+  "sequence": 42,
+  "invocationId": "3f6c2a9e-8d41-4b7a-9f0e-5c2d1b8a7e64",
   "tool": "payments.transfer",
   "argsSha256": "9b2f4c…e71a",
   "decision": "REQUIRE_APPROVAL",
+  "reason": "Moves real money",
+  "basis": "POLICY_MATCHED",
   "matchedPolicies": ["transfers-need-approval"],
+  "principal": "alice",
+  "conversationId": "conv-7",
   "timestamp": "2026-11-18T14:02:11.482Z",
   "previousHash": "1b42…08aa",
   "hash": "7f3a…c91e",
-  "signature": "MEUCIQ…"
+  "signature": "q3C1…Ag=="
 }
 ```
 
@@ -174,7 +180,7 @@ filtro de contenido, no en lugar de uno.
 ## Hoja de ruta hacia la 0.1.0
 
 - [x] `countersign-core`: modelo, `PolicyEngine`, condiciones SpEL aisladas
-- [ ] Recibos: JSON canónico, cadena SHA-256, firma Ed25519, verificación
+- [x] Recibos: JSON canónico, cadena SHA-256, firma Ed25519, verificación
 - [ ] `GuardedToolCallback` y envoltura automática de métodos `@Tool`
 - [ ] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` con un gateway que deniega al vencer el tiempo
 - [ ] `@RequiresApproval`

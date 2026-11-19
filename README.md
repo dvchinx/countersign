@@ -133,15 +133,21 @@ content filter, not instead of one.
 
 ```json
 {
-  "invocationId": "01JD6Y3Q8M7K4T2V9X0B5N1C3R",
+  "streamId": "banking-agent-7c1e",
+  "sequence": 42,
+  "invocationId": "3f6c2a9e-8d41-4b7a-9f0e-5c2d1b8a7e64",
   "tool": "payments.transfer",
   "argsSha256": "9b2f4c…e71a",
   "decision": "REQUIRE_APPROVAL",
+  "reason": "Moves real money",
+  "basis": "POLICY_MATCHED",
   "matchedPolicies": ["transfers-need-approval"],
+  "principal": "alice",
+  "conversationId": "conv-7",
   "timestamp": "2026-11-18T14:02:11.482Z",
   "previousHash": "1b42…08aa",
   "hash": "7f3a…c91e",
-  "signature": "MEUCIQ…"
+  "signature": "q3C1…Ag=="
 }
 ```
 
@@ -171,7 +177,7 @@ content filter, not instead of one.
 ## Roadmap to 0.1.0
 
 - [x] `countersign-core`: model, `PolicyEngine`, sandboxed SpEL conditions
-- [ ] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification
+- [x] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification
 - [ ] `GuardedToolCallback` and automatic wrapping of `@Tool` methods
 - [ ] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with a deny-on-timeout gateway
 - [ ] `@RequiresApproval`

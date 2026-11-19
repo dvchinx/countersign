@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `PolicyEngine`: policies evaluated in priority order, first match wins, configurable default decision, and
   fail-closed denial when a condition throws.
 - `Policy` with tool globs (`db.*`) and pluggable `Condition`s.
+- Receipts ([ADR 0003](docs/adr/0003-receipt-format-and-chaining.md)): canonical JSON, a SHA-256 hash chain per
+  stream, Ed25519 signatures through the `ReceiptSigner` port (`Ed25519ReceiptSigner`, `java.security` only), and
+  `ReceiptVerifier`, which detects edited, deleted, inserted or reordered receipts.
 - `SpelCondition` in `countersign-spring-ai`: SpEL conditions in a read-only `SimpleEvaluationContext` (no type
   references, constructors, bean references, method calls or assignment).
 - Multi-module Maven build: `countersign-core`, `countersign-spring-ai`, `countersign-spring-boot-starter`,
