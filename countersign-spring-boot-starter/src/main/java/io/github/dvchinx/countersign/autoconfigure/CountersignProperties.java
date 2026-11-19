@@ -29,6 +29,12 @@ public class CountersignProperties {
     /** Policies, evaluated by ascending priority, then in the order listed. The first one that applies decides. */
     private List<PolicyProperties> policies = new ArrayList<>();
 
+    /**
+     * Extra packages scanned for @RequiresApproval tool methods. The application's own packages (those of its
+     * @SpringBootApplication class) are always scanned.
+     */
+    private List<String> annotationPackages = new ArrayList<>();
+
     /** Receipt signing and chaining. */
     private Receipts receipts = new Receipts();
 
@@ -68,6 +74,14 @@ public class CountersignProperties {
 
     public void setPolicies(List<PolicyProperties> policies) {
         this.policies = policies;
+    }
+
+    public List<String> getAnnotationPackages() {
+        return annotationPackages;
+    }
+
+    public void setAnnotationPackages(List<String> annotationPackages) {
+        this.annotationPackages = annotationPackages;
     }
 
     public Receipts getReceipts() {

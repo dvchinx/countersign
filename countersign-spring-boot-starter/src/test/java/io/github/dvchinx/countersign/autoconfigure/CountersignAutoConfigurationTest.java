@@ -66,7 +66,8 @@ class CountersignAutoConfigurationTest {
                 assertThat(refuse.decision()).isEqualTo(Decision.Type.DENY);
                 assertThat(refuse.reason()).isEqualTo("No policy allows this call");
             });
-            assertThat(output).contains("Countersign is active: 0 policies, default decision DENY");
+            assertThat(output)
+                    .contains("Countersign is active: 0 policies (0 from @RequiresApproval), default decision DENY");
         });
     }
 

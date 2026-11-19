@@ -11,19 +11,25 @@ import io.github.dvchinx.countersign.core.spi.ApprovalGateway;
 import io.github.dvchinx.countersign.core.spi.AuditSink;
 import io.github.dvchinx.countersign.core.spi.ReceiptSigner;
 import io.github.dvchinx.countersign.springai.CountersignToolCallingBeanPostProcessor;
+import io.github.dvchinx.countersign.springai.annotation.RequiresApprovalPolicies;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigurationPackages;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -57,10 +63,23 @@ public class CountersignAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
-        PolicyEngine countersignPolicyEngine(CountersignProperties properties, ObjectProvider<Policy> policyBeans) {
+        PolicyEngine countersignPolicyEngine(
+                CountersignProperties properties, ObjectProvider<Policy> policyBeans, ApplicationContext context) {
             List<Policy> policies = new ArrayList<>(PolicyFactory.fromProperties(properties.getPolicies()));
             policyBeans.orderedStream().forEach(policies::add);
-            return new PolicyEngine(policies, PolicyFactory.defaultDecision(properties));
+            return new PolicyEngine(
+                    policies, annotatedPolicies(properties, context), PolicyFactory.defaultDecision(properties));
+        }
+
+        /** Mandatory policies from @RequiresApproval, found in the application's packages and any configured ones. */
+        private static List<Policy> annotatedPolicies(CountersignProperties properties, ApplicationContext context) {
+            Set<String> packages = new LinkedHashSet<>(properties.getAnnotationPackages());
+            if (AutoConfigurationPackages.has(context)) {
+                packages.addAll(AutoConfigurationPackages.get(context));
+            }
+            ClassLoader classLoader = context.getClassLoader();
+            return RequiresApprovalPolicies.scan(
+                    packages, classLoader != null ? classLoader : CountersignAutoConfiguration.class.getClassLoader());
         }
 
         @Bean
@@ -121,11 +140,14 @@ public class CountersignAutoConfiguration {
                 CountersignProperties properties) {
             return () -> {
                 ApprovalGateway gateway = approvals.getIfUnique();
+                int total =
+                        engine.policies().size() + engine.mandatoryPolicies().size();
                 LOG.info(
-                        "Countersign is active: {} {}, default decision {}, receipts stream '{}', audit sink {}{},"
-                                + " approvals {}",
-                        engine.policies().size(),
-                        engine.policies().size() == 1 ? "policy" : "policies",
+                        "Countersign is active: {} {} ({} from @RequiresApproval), default decision {}, receipts"
+                                + " stream '{}', audit sink {}{}, approvals {}",
+                        total,
+                        total == 1 ? "policy" : "policies",
+                        engine.mandatoryPolicies().size(),
                         engine.defaultDecision().type(),
                         receipts.streamId(),
                         auditSink.getClass().getSimpleName(),
@@ -135,7 +157,7 @@ public class CountersignAutoConfiguration {
                                 : gateway.getClass().getSimpleName() + " (timeout "
                                         + properties.getApproval().getTimeout() + ")");
                 boolean approvalNeeded = engine.defaultDecision().type() == Decision.Type.REQUIRE_APPROVAL
-                        || engine.policies().stream()
+                        || Stream.concat(engine.policies().stream(), engine.mandatoryPolicies().stream())
                                 .anyMatch(policy -> policy.decision().type() == Decision.Type.REQUIRE_APPROVAL);
                 if (approvalNeeded && gateway == null) {
                     LOG.warn("Some calls require approval, but no ApprovalGateway bean is defined: they will all be"
