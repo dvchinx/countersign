@@ -6,36 +6,14 @@ import io.github.dvchinx.countersign.core.guard.ToolCallGuard;
 import io.github.dvchinx.countersign.core.model.Decision;
 import io.github.dvchinx.countersign.core.model.EvaluationResult.Basis;
 import io.github.dvchinx.countersign.core.model.Receipt;
-import io.github.dvchinx.countersign.core.policy.Policy;
-import io.github.dvchinx.countersign.core.policy.PolicyEngine;
-import io.github.dvchinx.countersign.core.receipt.ArgumentsHmac;
-import io.github.dvchinx.countersign.core.receipt.Ed25519ReceiptSigner;
-import io.github.dvchinx.countersign.core.receipt.ReceiptChain;
 import io.github.dvchinx.countersign.core.receipt.ReceiptVerifier;
 import io.github.dvchinx.countersign.core.spi.ReceiptSigner;
-import io.github.dvchinx.countersign.springai.spel.SpelCondition;
-import java.math.BigDecimal;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.time.Clock;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.ToolResponseMessage;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.ChatOptions;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.support.ToolCallbacks;
-import org.springframework.ai.tool.annotation.Tool;
 
 /**
  * Drives real tool calls through a {@link ChatClient}, with a scripted model instead of a real API: the model asks
@@ -44,83 +22,15 @@ import org.springframework.ai.tool.annotation.Tool;
  */
 class GuardedToolCallbackChatClientTest {
 
-    private static final KeyPair KEYS = keys();
-
     private final BankTools bank = new BankTools();
     private final List<Receipt> receipts = new ArrayList<>();
 
-    private static final PolicyEngine POLICIES = new PolicyEngine(
-            List.of(
-                    Policy.builder("no-destructive-sql")
-                            .tools("db.*")
-                            .when(SpelCondition.parse("#args['sql'] matches '(?i).*\\b(drop|truncate|delete)\\b.*'"))
-                            .decision(Decision.deny("Destructive SQL is not allowed from agents"))
-                            .build(),
-                    Policy.builder("db-reads")
-                            .tools("db.*")
-                            .decision(Decision.allow())
-                            .build(),
-                    Policy.builder("transfers-need-approval")
-                            .tools("payments.transfer")
-                            .when(SpelCondition.parse("#args['amount'] > 1000"))
-                            .decision(Decision.requireApproval("Moves real money"))
-                            .build(),
-                    Policy.builder("small-transfers")
-                            .tools("payments.transfer")
-                            .decision(Decision.allow())
-                            .build()),
-            Decision.deny("No policy allows this call"));
-
-    /** Tools as a Spring app would write them; they count how often they really ran. */
-    static class BankTools {
-        int transfers;
-        int queries;
-
-        @Tool(name = "payments.transfer", description = "Transfer money to another account")
-        String transfer(String to, BigDecimal amount) {
-            transfers++;
-            return "Transferred " + amount + " to " + to;
-        }
-
-        @Tool(name = "db.query", description = "Run a SQL query")
-        String query(String sql) {
-            queries++;
-            return "3 rows";
-        }
+    private ToolCallGuard guard(ReceiptSigner signer) {
+        return BankPolicies.guard(signer, receipts::add);
     }
 
-    /** A chat model that first requests one tool call, then answers; it keeps every prompt it receives. */
-    static final class ScriptedChatModel implements ChatModel {
-        private final Deque<AssistantMessage> script = new ArrayDeque<>();
-        private final List<Prompt> prompts = new ArrayList<>();
-
-        ScriptedChatModel(String toolName, String arguments) {
-            script.add(AssistantMessage.builder()
-                    .content("")
-                    .toolCalls(List.of(new AssistantMessage.ToolCall("call-1", "function", toolName, arguments)))
-                    .build());
-            script.add(AssistantMessage.builder().content("done").build());
-        }
-
-        @Override
-        public ChatResponse call(Prompt prompt) {
-            prompts.add(prompt);
-            return new ChatResponse(List.of(new Generation(script.removeFirst())));
-        }
-
-        @Override
-        public ChatOptions getOptions() {
-            return ToolCallingChatOptions.builder().build();
-        }
-
-        /** What the tool call returned, as the model saw it on its second turn. */
-        String toolResult() {
-            List<Message> messages = prompts.getLast().getInstructions();
-            return ((ToolResponseMessage) messages.getLast())
-                    .getResponses()
-                    .getFirst()
-                    .responseData();
-        }
+    private ToolCallGuard guard() {
+        return BankPolicies.guard(receipts::add);
     }
 
     private String ask(ScriptedChatModel model, ToolCallGuard guard) {
@@ -130,18 +40,6 @@ class GuardedToolCallbackChatClientTest {
                 .toolContext(Map.of(GuardedToolCallback.PRINCIPAL_KEY, "alice"))
                 .call()
                 .content();
-    }
-
-    private ToolCallGuard guard(ReceiptSigner signer) {
-        return new ToolCallGuard(
-                POLICIES,
-                ReceiptChain.start("bank-1", signer, new ArgumentsHmac(new byte[32]), Clock.systemUTC()),
-                receipts::add,
-                false);
-    }
-
-    private ToolCallGuard guard() {
-        return guard(new Ed25519ReceiptSigner(KEYS.getPrivate()));
     }
 
     @Test
@@ -221,15 +119,9 @@ class GuardedToolCallbackChatClientTest {
                 .extracting(Receipt::decision)
                 .containsExactly(
                         Decision.Type.ALLOW, Decision.Type.REQUIRE_APPROVAL, Decision.Type.ALLOW, Decision.Type.DENY);
-        assertThat(new ReceiptVerifier(KEYS.getPublic()).verify(receipts).isValid())
+        assertThat(new ReceiptVerifier(BankPolicies.KEYS.getPublic())
+                        .verify(receipts)
+                        .isValid())
                 .isTrue();
-    }
-
-    private static KeyPair keys() {
-        try {
-            return KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
     }
 }
