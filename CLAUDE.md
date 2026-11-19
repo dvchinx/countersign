@@ -83,17 +83,19 @@ interfaces in `core.spi`. Spring and Spring AI are adapters.
 Request flow for a single tool call:
 
 ```
-Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)
+Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)                (countersign-spring-ai)
                           │
-                          ├─ 1. Build ToolInvocation (tool name, parsed args, principal, conversation id)
-                          ├─ 2. PolicyEngine.evaluate(invocation) ──► Decision
-                          ├─ 3. Apply decision:
-                          │      ALLOW            → delegate to the real ToolCallback
-                          │      DENY             → return a structured refusal to the model (no exception leak)
-                          │      REQUIRE_APPROVAL → ApprovalGateway (default: deny on timeout)
-                          │      REDACT           → Redactor transforms args and/or result, then delegate
-                          ├─ 4. Build Receipt (decision, matched policies, args hash, prev hash, signature)
-                          └─ 5. AuditSink.append(receipt) + Micrometer observation
+                          ├─ 1. Parse input strictly, build ToolInvocation (tool name, args, principal,
+                          │     conversation id). Unreadable input → refused and recorded.
+                          └─ ToolCallGuard.check(invocation) ──► Verdict           (countersign-core)
+                               ├─ 2. PolicyEngine.evaluate(invocation) ──► EvaluationResult
+                               ├─ 3. ReceiptChain.append ──► signed Receipt (before the tool runs)
+                               ├─ 4. AuditSink.append(receipt) + Micrometer observation
+                               └─ 5. Apply decision:
+                                      ALLOW            → delegate to the real ToolCallback
+                                      DENY             → structured refusal to the model (no exception leak)
+                                      REQUIRE_APPROVAL → ApprovalGateway (default: deny on timeout)
+                                      REDACT           → Redactor transforms args and/or result, then delegate
 ```
 
 ### Key types (core)
@@ -103,7 +105,7 @@ Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)
 - `Policy`: id, target tools (glob), condition, decision, priority.
 - `PolicyEngine`: evaluates policies in priority order; first match wins; if nothing matches,
   applies the configured default (`deny` by default).
-- `Receipt` (record): invocation id, tool, args SHA-256, decision, matched policy ids, timestamp,
+- `Receipt` (record): invocation id, tool, args HMAC-SHA256 (ADR 0004), decision, matched policy ids, timestamp,
   `previousHash`, `hash`, `signature`.
 
 ### Integration points (spring-ai module)
@@ -126,6 +128,7 @@ countersign:
   default-decision: deny          # fail closed
   receipts:
     signing-key: ${COUNTERSIGN_SIGNING_KEY}   # Ed25519 private key (PKCS#8, base64)
+    args-hmac-key: ${COUNTERSIGN_ARGS_HMAC_KEY}  # >= 32 random bytes, base64; keep it out of the audit store
   policies:
     - id: no-destructive-sql
       tools: ["db.*"]
@@ -148,7 +151,7 @@ references, no bean access, no method invocation on arbitrary types)**. Never us
    never in silently executing the tool. Make this behavior explicit and tested.
 2. **Deterministic decisions.** No LLM calls in the decision path in the MVP. Same input,
    same policies → same decision.
-3. **Never log or persist raw arguments by default.** Receipts store a hash of the arguments.
+3. **Never log or persist raw arguments by default.** Receipts store a keyed hash (HMAC-SHA256) of the arguments.
    Persisting raw args is opt-in and goes through the `Redactor`.
 4. **Zero surprise for users.** Adding the starter with no policies must not break an app
    except by the documented default (`deny`). Startup logs must say clearly that Countersign is

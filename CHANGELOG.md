@@ -18,6 +18,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Receipts ([ADR 0003](docs/adr/0003-receipt-format-and-chaining.md)): canonical JSON, a SHA-256 hash chain per
   stream, Ed25519 signatures through the `ReceiptSigner` port (`Ed25519ReceiptSigner`, `java.security` only), and
   `ReceiptVerifier`, which detects edited, deleted, inserted or reordered receipts.
+- `GuardedToolCallback` and `GuardedToolCallbackProvider` in `countersign-spring-ai`: every call is parsed
+  strictly, checked and recorded before the tool runs, and refused calls return a structured JSON refusal to the
+  model. The principal and conversation id come from the `ToolContext` (`countersign.principal`,
+  `countersign.conversationId`).
+- `ToolCallGuard` in `countersign-core`: the framework-free decision path (evaluate, receipt, audit, verdict),
+  with the new `AuditSink` port ([ADR 0005](docs/adr/0005-decision-path-in-the-core.md)).
+- Receipts store an HMAC-SHA256 of the arguments (`argsHmac`) instead of a plain SHA-256, so values cannot be
+  recovered by guessing ([ADR 0004](docs/adr/0004-keyed-hash-for-receipt-arguments.md)).
 - `SpelCondition` in `countersign-spring-ai`: SpEL conditions in a read-only `SimpleEvaluationContext` (no type
   references, constructors, bean references, method calls or assignment).
 - Multi-module Maven build: `countersign-core`, `countersign-spring-ai`, `countersign-spring-boot-starter`,
