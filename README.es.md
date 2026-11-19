@@ -181,7 +181,7 @@ filtro de contenido, no en lugar de uno.
 
 - [x] `countersign-core`: modelo, `PolicyEngine`, condiciones SpEL aisladas
 - [x] Recibos: JSON canónico, cadena SHA-256, firma Ed25519, verificación
-- [ ] `GuardedToolCallback` y envoltura automática de métodos `@Tool`
+- [x] `GuardedToolCallback` y envoltura automática de métodos `@Tool`
 - [ ] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` con un gateway que deniega al vencer el tiempo
 - [ ] `@RequiresApproval`
 - [ ] Starter de Spring Boot y línea de arranque en el log

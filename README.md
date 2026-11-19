@@ -178,7 +178,7 @@ content filter, not instead of one.
 
 - [x] `countersign-core`: model, `PolicyEngine`, sandboxed SpEL conditions
 - [x] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification
-- [ ] `GuardedToolCallback` and automatic wrapping of `@Tool` methods
+- [x] `GuardedToolCallback` and automatic wrapping of `@Tool` methods
 - [ ] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with a deny-on-timeout gateway
 - [ ] `@RequiresApproval`
 - [ ] Spring Boot starter and startup banner line

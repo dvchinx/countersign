@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   strictly, checked and recorded before the tool runs, and refused calls return a structured JSON refusal to the
   model. The principal and conversation id come from the `ToolContext` (`countersign.principal`,
   `countersign.conversationId`).
+- Automatic wrapping ([ADR 0006](docs/adr/0006-automatic-wrapping-via-tool-calling-manager.md)):
+  `CountersignToolCallingBeanPostProcessor` decorates Spring AI's `ToolCallingManager` and `ToolCallbackResolver`
+  beans with `GuardedToolCallingManager` and `GuardedToolCallbackResolver`, so tools passed with `.tools(...)`,
+  `defaultTools(...)`, providers (including MCP clients) and the resolution fallback are all guarded.
 - `ToolCallGuard` in `countersign-core`: the framework-free decision path (evaluate, receipt, audit, verdict),
   with the new `AuditSink` port ([ADR 0005](docs/adr/0005-decision-path-in-the-core.md)).
 - Receipts store an HMAC-SHA256 of the arguments (`argsHmac`) instead of a plain SHA-256, so values cannot be

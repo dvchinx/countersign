@@ -112,8 +112,9 @@ Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)               
 
 - Decorate tool callbacks instead of modifying them: `GuardedToolCallback` implements
   `ToolCallback` and delegates to the original.
-- Wrapping happens through a `BeanPostProcessor` (or a decorating `ToolCallbackProvider`), so
-  users do not change their `@Tool` methods.
+- Wrapping is automatic: `CountersignToolCallingBeanPostProcessor` decorates Spring AI's
+  `ToolCallingManager` and `ToolCallbackResolver` beans, so every tool a `ChatClient` executes is
+  guarded, however it was registered, and users do not change their `@Tool` methods (ADR 0006).
 - Annotations for per-tool policy, read at startup:
   - `@RequiresApproval(reason = "...")`
   - `@ToolPolicy(id = "...")` to attach a named policy from configuration.
@@ -254,7 +255,7 @@ Done means: published to Maven Central as `0.1.0` with the banking demo and a re
 
 - [x] `countersign-core`: model, `PolicyEngine` (first match wins, default decision), SpEL conditions with `SimpleEvaluationContext`
 - [x] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification utility
-- [ ] `countersign-spring-ai`: `GuardedToolCallback` + automatic wrapping of `@Tool` methods
+- [x] `countersign-spring-ai`: `GuardedToolCallback` + automatic wrapping of `@Tool` methods
 - [ ] Decisions: ALLOW, DENY, REQUIRE_APPROVAL (with default deny-on-timeout gateway)
 - [ ] `@RequiresApproval` annotation
 - [ ] Starter: auto-config, `countersign.*` properties, startup banner line
