@@ -173,7 +173,7 @@ filtro de contenido, no en lugar de uno.
 
 ## Hoja de ruta hacia la 0.1.0
 
-- [ ] `countersign-core`: modelo, `PolicyEngine`, condiciones SpEL aisladas
+- [x] `countersign-core`: modelo, `PolicyEngine`, condiciones SpEL aisladas
 - [ ] Recibos: JSON canónico, cadena SHA-256, firma Ed25519, verificación
 - [ ] `GuardedToolCallback` y envoltura automática de métodos `@Tool`
 - [ ] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` con un gateway que deniega al vencer el tiempo

@@ -170,7 +170,7 @@ content filter, not instead of one.
 
 ## Roadmap to 0.1.0
 
-- [ ] `countersign-core`: model, `PolicyEngine`, sandboxed SpEL conditions
+- [x] `countersign-core`: model, `PolicyEngine`, sandboxed SpEL conditions
 - [ ] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification
 - [ ] `GuardedToolCallback` and automatic wrapping of `@Tool` methods
 - [ ] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with a deny-on-timeout gateway

@@ -249,7 +249,7 @@ without touching the policy engine:
 
 Done means: published to Maven Central as `0.1.0` with the banking demo and a recorded GIF.
 
-- [ ] `countersign-core`: model, `PolicyEngine` (first match wins, default decision), SpEL conditions with `SimpleEvaluationContext`
+- [x] `countersign-core`: model, `PolicyEngine` (first match wins, default decision), SpEL conditions with `SimpleEvaluationContext`
 - [ ] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification utility
 - [ ] `countersign-spring-ai`: `GuardedToolCallback` + automatic wrapping of `@Tool` methods
 - [ ] Decisions: ALLOW, DENY, REQUIRE_APPROVAL (with default deny-on-timeout gateway)
