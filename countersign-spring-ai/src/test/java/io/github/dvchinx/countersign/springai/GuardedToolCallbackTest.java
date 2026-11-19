@@ -66,20 +66,20 @@ class GuardedToolCallbackTest {
 
     private ToolCallGuard guard(Decision decision) throws Exception {
         var keys = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
-        return new ToolCallGuard(
-                new PolicyEngine(
-                        List.of(Policy.builder("p")
-                                .tools("*")
-                                .decision(decision)
-                                .build()),
-                        Decision.deny("default")),
-                ReceiptChain.start(
-                        "s",
-                        new Ed25519ReceiptSigner(keys.getPrivate()),
-                        new ArgumentsHmac(new byte[32]),
-                        Clock.systemUTC()),
-                receipts::add,
-                false);
+        return ToolCallGuard.builder(
+                        new PolicyEngine(
+                                List.of(Policy.builder("p")
+                                        .tools("*")
+                                        .decision(decision)
+                                        .build()),
+                                Decision.deny("default")),
+                        ReceiptChain.start(
+                                "s",
+                                new Ed25519ReceiptSigner(keys.getPrivate()),
+                                new ArgumentsHmac(new byte[32]),
+                                Clock.systemUTC()),
+                        receipts::add)
+                .build();
     }
 
     @Test

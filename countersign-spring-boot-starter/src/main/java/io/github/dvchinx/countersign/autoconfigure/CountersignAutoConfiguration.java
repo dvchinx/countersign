@@ -7,6 +7,7 @@ import io.github.dvchinx.countersign.core.policy.Policy;
 import io.github.dvchinx.countersign.core.policy.PolicyEngine;
 import io.github.dvchinx.countersign.core.receipt.ArgumentsHmac;
 import io.github.dvchinx.countersign.core.receipt.ReceiptChain;
+import io.github.dvchinx.countersign.core.spi.ApprovalGateway;
 import io.github.dvchinx.countersign.core.spi.AuditSink;
 import io.github.dvchinx.countersign.core.spi.ReceiptSigner;
 import io.github.dvchinx.countersign.springai.CountersignToolCallingBeanPostProcessor;
@@ -99,23 +100,47 @@ public class CountersignAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         ToolCallGuard countersignToolCallGuard(
-                PolicyEngine engine, ReceiptChain receipts, AuditSink auditSink, CountersignProperties properties) {
-            return new ToolCallGuard(
-                    engine, receipts, auditSink, properties.getAudit().isStrict());
+                PolicyEngine engine,
+                ReceiptChain receipts,
+                AuditSink auditSink,
+                ObjectProvider<ApprovalGateway> approvals,
+                CountersignProperties properties) {
+            return ToolCallGuard.builder(engine, receipts, auditSink)
+                    .approvals(approvals.getIfUnique())
+                    .approvalTimeout(properties.getApproval().getTimeout())
+                    .strictAudit(properties.getAudit().isStrict())
+                    .build();
         }
 
         @Bean
         SmartInitializingSingleton countersignStartupReport(
-                PolicyEngine engine, ReceiptChain receipts, AuditSink auditSink, CountersignProperties properties) {
+                PolicyEngine engine,
+                ReceiptChain receipts,
+                AuditSink auditSink,
+                ObjectProvider<ApprovalGateway> approvals,
+                CountersignProperties properties) {
             return () -> {
+                ApprovalGateway gateway = approvals.getIfUnique();
                 LOG.info(
-                        "Countersign is active: {} {}, default decision {}, receipts stream '{}', audit sink {}{}",
+                        "Countersign is active: {} {}, default decision {}, receipts stream '{}', audit sink {}{},"
+                                + " approvals {}",
                         engine.policies().size(),
                         engine.policies().size() == 1 ? "policy" : "policies",
                         engine.defaultDecision().type(),
                         receipts.streamId(),
                         auditSink.getClass().getSimpleName(),
-                        properties.getAudit().isStrict() ? " (strict)" : "");
+                        properties.getAudit().isStrict() ? " (strict)" : "",
+                        gateway == null
+                                ? "none"
+                                : gateway.getClass().getSimpleName() + " (timeout "
+                                        + properties.getApproval().getTimeout() + ")");
+                boolean approvalNeeded = engine.defaultDecision().type() == Decision.Type.REQUIRE_APPROVAL
+                        || engine.policies().stream()
+                                .anyMatch(policy -> policy.decision().type() == Decision.Type.REQUIRE_APPROVAL);
+                if (approvalNeeded && gateway == null) {
+                    LOG.warn("Some calls require approval, but no ApprovalGateway bean is defined: they will all be"
+                            + " denied. Define one, for example an InMemoryApprovalGateway behind an approval screen.");
+                }
                 if (engine.defaultDecision().type() != Decision.Type.DENY) {
                     LOG.warn(
                             "Countersign default decision is {}: tool calls that no policy matches are not denied",

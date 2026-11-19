@@ -54,6 +54,13 @@ class DecisionTest {
     }
 
     @Test
+    void approvalAnswersNameWhoGaveThem() {
+        assertThat(ApprovalDecision.approved("bob").approver()).isEqualTo("bob");
+        assertThatThrownBy(() -> ApprovalDecision.approved(" ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ApprovalDecision.rejected("", "no")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void invocationNeedsAToolName() {
         assertThatThrownBy(() -> ToolInvocation.of(" ", JsonObject.empty()))
                 .isInstanceOf(IllegalArgumentException.class);

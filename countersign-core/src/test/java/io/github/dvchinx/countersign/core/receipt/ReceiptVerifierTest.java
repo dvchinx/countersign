@@ -9,6 +9,7 @@ import static io.github.dvchinx.countersign.core.receipt.ReceiptFixtures.verifie
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.dvchinx.countersign.core.model.ApprovalOutcome;
 import io.github.dvchinx.countersign.core.model.Decision;
 import io.github.dvchinx.countersign.core.model.EvaluationResult;
 import io.github.dvchinx.countersign.core.model.Receipt;
@@ -32,7 +33,9 @@ class ReceiptVerifierTest {
         ReceiptChain chain = newChain();
         List<Receipt> receipts = new ArrayList<>();
         for (int i = 1; i <= size; i++) {
-            receipts.add(chain.append(transfer("inv-" + i, i * 1000L), needsApproval()));
+            // Approved receipts, so every field, approval and approver included, has a value to tamper with.
+            receipts.add(
+                    chain.append(transfer("inv-" + i, i * 1000L), needsApproval(), ApprovalOutcome.APPROVED, "bob"));
         }
         return receipts;
     }
@@ -144,6 +147,8 @@ class ReceiptVerifierTest {
             case String s -> s + "x";
             case Long l -> l + 1;
             case Instant instant -> instant.plusMillis(1);
+            case ApprovalOutcome outcome ->
+                outcome == ApprovalOutcome.APPROVED ? ApprovalOutcome.REJECTED : ApprovalOutcome.APPROVED;
             case Decision.Type type -> type == Decision.Type.ALLOW ? Decision.Type.DENY : Decision.Type.ALLOW;
             case EvaluationResult.Basis basis ->
                 basis == EvaluationResult.Basis.POLICY_MATCHED

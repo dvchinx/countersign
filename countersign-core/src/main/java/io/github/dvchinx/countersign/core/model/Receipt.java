@@ -26,6 +26,8 @@ import org.jspecify.annotations.Nullable;
  * @param reason the decision's reason, or {@code null} for {@link Decision.Type#ALLOW}
  * @param basis why the decision was reached
  * @param matchedPolicies the ids of the policies that produced the decision; empty when the default applied
+ * @param approval what happened to the approval, for {@link Decision.Type#REQUIRE_APPROVAL}; otherwise {@code null}
+ * @param approver who approved or rejected the call, or {@code null} if nobody answered
  * @param principal who the agent acted for, or {@code null} if unknown
  * @param conversationId the conversation, or {@code null} if unknown
  * @param timestamp when the receipt was created, to the millisecond
@@ -44,6 +46,8 @@ public record Receipt(
         @Nullable String reason,
         EvaluationResult.Basis basis,
         List<String> matchedPolicies,
+        @Nullable ApprovalOutcome approval,
+        @Nullable String approver,
         @Nullable String principal,
         @Nullable String conversationId,
         Instant timestamp,

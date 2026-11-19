@@ -1,6 +1,7 @@
 package io.github.dvchinx.countersign.autoconfigure;
 
 import io.github.dvchinx.countersign.core.model.Decision;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -33,6 +34,9 @@ public class CountersignProperties {
 
     /** Where receipts are stored, and what happens when storing one fails. */
     private Audit audit = new Audit();
+
+    /** Human approval of calls that a policy marks require-approval. */
+    private Approval approval = new Approval();
 
     public boolean isEnabled() {
         return enabled;
@@ -80,6 +84,32 @@ public class CountersignProperties {
 
     public void setAudit(Audit audit) {
         this.audit = audit;
+    }
+
+    public Approval getApproval() {
+        return approval;
+    }
+
+    public void setApproval(Approval approval) {
+        this.approval = approval;
+    }
+
+    /** Approval settings. The approver itself is an ApprovalGateway bean. */
+    public static class Approval {
+
+        /**
+         * How long a call waits for a human answer before it is refused. The agent's request blocks for up to this
+         * long, so keep it below any HTTP timeout in front of it.
+         */
+        private Duration timeout = Duration.ofMinutes(2);
+
+        public Duration getTimeout() {
+            return timeout;
+        }
+
+        public void setTimeout(Duration timeout) {
+            this.timeout = timeout;
+        }
     }
 
     /** One policy, as written under {@code countersign.policies}. */

@@ -2,9 +2,11 @@ package io.github.dvchinx.countersign.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.dvchinx.countersign.core.approval.InMemoryApprovalGateway;
 import io.github.dvchinx.countersign.core.audit.InMemoryAuditSink;
 import io.github.dvchinx.countersign.core.guard.ToolCallGuard;
 import io.github.dvchinx.countersign.core.guard.Verdict;
+import io.github.dvchinx.countersign.core.model.ApprovalOutcome;
 import io.github.dvchinx.countersign.core.model.Decision;
 import io.github.dvchinx.countersign.core.model.JsonObject;
 import io.github.dvchinx.countersign.core.model.Receipt;
@@ -237,6 +239,44 @@ class CountersignAutoConfigurationTest {
                 })
                 .run(context -> assertThat(context.getBean(ToolCallGuard.class).check(call("x")))
                         .isInstanceOf(Verdict.Refuse.class));
+    }
+
+    @Test
+    void asksTheApplicationsApprovalGatewayWithTheConfiguredTimeout(CapturedOutput output) {
+        InMemoryApprovalGateway approvals = new InMemoryApprovalGateway();
+        runner.withPropertyValues(
+                        "countersign.approval.timeout=50ms",
+                        "countersign.policies[0].id=approve-all",
+                        "countersign.policies[0].tools=*",
+                        "countersign.policies[0].decision=require-approval")
+                .withBean(InMemoryApprovalGateway.class, () -> approvals)
+                .run(context -> {
+                    Verdict verdict = context.getBean(ToolCallGuard.class).check(call("x"));
+
+                    assertThat(verdict)
+                            .isInstanceOfSatisfying(
+                                    Verdict.Refuse.class,
+                                    refuse -> assertThat(refuse.receipt().approval())
+                                            .isEqualTo(ApprovalOutcome.TIMED_OUT));
+                    assertThat(output).contains("approvals InMemoryApprovalGateway (timeout PT0.05S)");
+                    assertThat(output).doesNotContain("no ApprovalGateway bean is defined");
+                });
+    }
+
+    @Test
+    void warnsWhenCallsNeedApprovalButNobodyCanGiveIt(CapturedOutput output) {
+        runner.withPropertyValues(
+                        "countersign.policies[0].id=approve-all",
+                        "countersign.policies[0].tools=*",
+                        "countersign.policies[0].decision=require-approval")
+                .run(context -> {
+                    assertThat(output).contains("approvals none").contains("no ApprovalGateway bean is defined");
+                    assertThat(((Verdict.Refuse)
+                                            context.getBean(ToolCallGuard.class).check(call("x")))
+                                    .receipt()
+                                    .approval())
+                            .isEqualTo(ApprovalOutcome.UNAVAILABLE);
+                });
     }
 
     @Test

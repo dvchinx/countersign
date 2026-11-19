@@ -28,6 +28,8 @@ class InMemoryAuditSinkTest {
                 List.of("p"),
                 null,
                 null,
+                null,
+                null,
                 Instant.EPOCH,
                 "prev",
                 "hash",

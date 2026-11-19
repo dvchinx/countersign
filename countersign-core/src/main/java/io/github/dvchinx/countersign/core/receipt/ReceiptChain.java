@@ -1,5 +1,6 @@
 package io.github.dvchinx.countersign.core.receipt;
 
+import io.github.dvchinx.countersign.core.model.ApprovalOutcome;
 import io.github.dvchinx.countersign.core.model.Decision;
 import io.github.dvchinx.countersign.core.model.EvaluationResult;
 import io.github.dvchinx.countersign.core.model.Receipt;
@@ -101,8 +102,34 @@ public final class ReceiptChain {
      * @throws ReceiptException if hashing or signing fails; the chain does not advance and the call must be denied
      */
     public Receipt append(ToolInvocation invocation, EvaluationResult result) {
+        return append(invocation, result, null, null);
+    }
+
+    /**
+     * Creates, signs and links the receipt for an invocation that went through approval.
+     *
+     * @param invocation the invocation that was evaluated
+     * @param result what the policy engine decided
+     * @param approval what happened to the approval; only for a {@link Decision.RequireApproval} decision
+     * @param approver who approved or rejected the call; only when somebody answered
+     * @return the signed receipt
+     * @throws IllegalArgumentException if the approval fields do not fit the decision
+     * @throws ReceiptException if hashing or signing fails; the chain does not advance and the call must be denied
+     */
+    public Receipt append(
+            ToolInvocation invocation,
+            EvaluationResult result,
+            @Nullable ApprovalOutcome approval,
+            @Nullable String approver) {
         Objects.requireNonNull(invocation, "invocation");
         Objects.requireNonNull(result, "result");
+        if (approval != null && !(result.decision() instanceof Decision.RequireApproval)) {
+            throw new IllegalArgumentException("approval is only recorded for a require-approval decision");
+        }
+        boolean answered = approval == ApprovalOutcome.APPROVED || approval == ApprovalOutcome.REJECTED;
+        if (answered != (approver != null)) {
+            throw new IllegalArgumentException("approver is recorded exactly when somebody approved or rejected");
+        }
         String argsHmac = argumentsHmac.hex(invocation.arguments());
         List<String> matchedPolicies = result.policyId() == null ? List.of() : List.of(result.policyId());
 
@@ -118,6 +145,8 @@ public final class ReceiptChain {
                     reasonOf(result.decision()),
                     result.basis(),
                     matchedPolicies,
+                    approval,
+                    approver,
                     invocation.principal(),
                     invocation.conversationId(),
                     // Millisecond precision survives a round trip through any database, so stored receipts still

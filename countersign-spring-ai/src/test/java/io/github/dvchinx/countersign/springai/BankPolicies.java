@@ -7,12 +7,14 @@ import io.github.dvchinx.countersign.core.policy.PolicyEngine;
 import io.github.dvchinx.countersign.core.receipt.ArgumentsHmac;
 import io.github.dvchinx.countersign.core.receipt.Ed25519ReceiptSigner;
 import io.github.dvchinx.countersign.core.receipt.ReceiptChain;
+import io.github.dvchinx.countersign.core.spi.ApprovalGateway;
 import io.github.dvchinx.countersign.core.spi.AuditSink;
 import io.github.dvchinx.countersign.core.spi.ReceiptSigner;
 import io.github.dvchinx.countersign.springai.spel.SpelCondition;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 
 /** The banking demo's policies and a guard built from them, shared by the integration tests. */
@@ -45,11 +47,19 @@ final class BankPolicies {
     private BankPolicies() {}
 
     static ToolCallGuard guard(ReceiptSigner signer, AuditSink sink) {
-        return new ToolCallGuard(
-                ENGINE,
-                ReceiptChain.start("bank-1", signer, new ArgumentsHmac(new byte[32]), Clock.systemUTC()),
-                sink,
-                false);
+        return builder(signer, sink).build();
+    }
+
+    static ToolCallGuard.Builder builder(ReceiptSigner signer, AuditSink sink) {
+        return ToolCallGuard.builder(
+                ENGINE, ReceiptChain.start("bank-1", signer, new ArgumentsHmac(new byte[32]), Clock.systemUTC()), sink);
+    }
+
+    static ToolCallGuard guard(AuditSink sink, ApprovalGateway approvals, Duration timeout) {
+        return builder(new Ed25519ReceiptSigner(KEYS.getPrivate()), sink)
+                .approvals(approvals)
+                .approvalTimeout(timeout)
+                .build();
     }
 
     static ToolCallGuard guard(AuditSink sink) {

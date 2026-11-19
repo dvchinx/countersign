@@ -1,5 +1,6 @@
 package io.github.dvchinx.countersign.core.receipt;
 
+import io.github.dvchinx.countersign.core.model.ApprovalOutcome;
 import io.github.dvchinx.countersign.core.model.Decision;
 import io.github.dvchinx.countersign.core.model.EvaluationResult;
 import io.github.dvchinx.countersign.core.model.JsonArray;
@@ -31,6 +32,8 @@ record ReceiptBody(
         @Nullable String reason,
         EvaluationResult.Basis basis,
         List<String> matchedPolicies,
+        @Nullable ApprovalOutcome approval,
+        @Nullable String approver,
         @Nullable String principal,
         @Nullable String conversationId,
         Instant timestamp,
@@ -51,6 +54,8 @@ record ReceiptBody(
                 receipt.reason(),
                 receipt.basis(),
                 receipt.matchedPolicies(),
+                receipt.approval(),
+                receipt.approver(),
                 receipt.principal(),
                 receipt.conversationId(),
                 receipt.timestamp(),
@@ -73,6 +78,8 @@ record ReceiptBody(
                         new JsonArray(matchedPolicies.stream()
                                 .<JsonValue>map(JsonString::of)
                                 .toList()))
+                .put("approval", approval == null ? JsonNull.INSTANCE : JsonString.of(approval.name()))
+                .put("approver", nullable(approver))
                 .put("principal", nullable(principal))
                 .put("conversationId", nullable(conversationId))
                 .put("timestamp", TIMESTAMP.format(timestamp))
@@ -97,6 +104,8 @@ record ReceiptBody(
                 reason,
                 basis,
                 matchedPolicies,
+                approval,
+                approver,
                 principal,
                 conversationId,
                 timestamp,

@@ -10,6 +10,7 @@ import static io.github.dvchinx.countersign.core.receipt.ReceiptFixtures.verifie
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.dvchinx.countersign.core.model.ApprovalOutcome;
 import io.github.dvchinx.countersign.core.model.Decision;
 import io.github.dvchinx.countersign.core.model.EvaluationResult;
 import io.github.dvchinx.countersign.core.model.Receipt;
@@ -158,6 +159,23 @@ class ReceiptChainTest {
                 .toList();
         assertThat(stream).hasSize(500);
         assertThat(verifier().verify(stream)).isEqualTo(new VerificationResult.Valid(500));
+    }
+
+    @Test
+    void recordsApprovalOnlyWhereItFits() {
+        ReceiptChain chain = newChain();
+        EvaluationResult allowed = EvaluationResult.matched("ok", Decision.allow());
+
+        assertThatThrownBy(() -> chain.append(transfer("inv-1", 1), allowed, ApprovalOutcome.APPROVED, "bob"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> chain.append(transfer("inv-1", 1), needsApproval(), ApprovalOutcome.TIMED_OUT, "bob"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> chain.append(transfer("inv-1", 1), needsApproval(), ApprovalOutcome.APPROVED, null))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        Receipt timedOut = chain.append(transfer("inv-1", 1), needsApproval(), ApprovalOutcome.TIMED_OUT, null);
+        assertThat(timedOut.sequence()).isEqualTo(1);
+        assertThat(timedOut.approval()).isEqualTo(ApprovalOutcome.TIMED_OUT);
     }
 
     @Test

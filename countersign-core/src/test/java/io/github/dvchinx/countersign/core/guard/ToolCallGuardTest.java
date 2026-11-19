@@ -69,7 +69,9 @@ class ToolCallGuardTest {
     }
 
     private ToolCallGuard guard() {
-        return new ToolCallGuard(ENGINE, chain(signer()), sink, false);
+        return ToolCallGuard.builder(ENGINE, chain(signer()), sink)
+                .strictAudit(false)
+                .build();
     }
 
     private static ToolInvocation call(String tool, long amount) {
@@ -132,13 +134,14 @@ class ToolCallGuardTest {
 
     @Test
     void refusesWithoutReceiptWhenSigningFails() {
-        ToolCallGuard guard = new ToolCallGuard(
-                ENGINE,
-                chain(hash -> {
-                    throw new IllegalStateException("HSM unreachable");
-                }),
-                sink,
-                false);
+        ToolCallGuard guard = ToolCallGuard.builder(
+                        ENGINE,
+                        chain(hash -> {
+                            throw new IllegalStateException("HSM unreachable");
+                        }),
+                        sink)
+                .strictAudit(false)
+                .build();
 
         Verdict verdict = guard.check(call("payments.transfer", 50));
 
@@ -151,14 +154,18 @@ class ToolCallGuardTest {
 
     @Test
     void letsTheDecisionStandWhenTheAuditSinkFailsAndAuditIsNotStrict() {
-        ToolCallGuard guard = new ToolCallGuard(ENGINE, chain(signer()), brokenSink, false);
+        ToolCallGuard guard = ToolCallGuard.builder(ENGINE, chain(signer()), brokenSink)
+                .strictAudit(false)
+                .build();
 
         assertThat(guard.check(call("payments.transfer", 50))).isInstanceOf(Verdict.Proceed.class);
     }
 
     @Test
     void refusesWhenTheAuditSinkFailsAndAuditIsStrict() {
-        ToolCallGuard guard = new ToolCallGuard(ENGINE, chain(signer()), brokenSink, true);
+        ToolCallGuard guard = ToolCallGuard.builder(ENGINE, chain(signer()), brokenSink)
+                .strictAudit(true)
+                .build();
 
         Verdict verdict = guard.check(call("payments.transfer", 50));
 
