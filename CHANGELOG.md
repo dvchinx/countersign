@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   strictly, checked and recorded before the tool runs, and refused calls return a structured JSON refusal to the
   model. The principal and conversation id come from the `ToolContext` (`countersign.principal`,
   `countersign.conversationId`).
+- `@RequiresApproval` ([ADR 0009](docs/adr/0009-requires-approval-as-mandatory-policy.md)): declares on a `@Tool`
+  method that its calls need approval. Found at startup by scanning the application's packages, so it covers tool
+  objects that are not beans. It becomes a mandatory policy: a configured `allow` cannot skip it and a configured
+  `deny` still wins. `PolicyEngine` supports mandatory policies, which can only make a decision stricter.
 - Human approval ([ADR 0008](docs/adr/0008-human-approval.md)): the `ApprovalGateway` port, with
   `InMemoryApprovalGateway` for approval screens in the same application. Countersign waits up to
   `countersign.approval.timeout` and refuses the call if the answer is a rejection, never arrives, or cannot be

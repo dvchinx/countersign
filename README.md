@@ -76,7 +76,7 @@ countersign:
 **3. That's it.** Your existing tools are wrapped automatically:
 
 ```java
-@Tool(description = "Transfer money between accounts")
+@Tool(name = "payments.transfer", description = "Transfer money between accounts")
 @RequiresApproval(reason = "Moves real money")   // optional: per-tool policy as an annotation
 public TransferResult transfer(String from, String to, BigDecimal amount) { ... }
 ```
@@ -174,6 +174,7 @@ All properties live under `countersign.*`. Only `policies` is needed to get star
 | `countersign.audit.strict` | `false` | Refuse the call when its receipt cannot be stored. |
 | `countersign.audit.in-memory-capacity` | `10000` | Receipts kept by the default in-memory sink. |
 | `countersign.approval.timeout` | `2m` | How long a call waits for a human answer before it is denied. |
+| `countersign.annotation-packages` | | Extra packages scanned for `@RequiresApproval`; your application's packages are always scanned. |
 
 A broken policy (missing tool, bad SpEL, duplicate id) stops the application at startup with a message that names
 the property. A typo never leaves a tool silently unguarded.
@@ -195,6 +196,12 @@ countersign:
 
 Receipts are kept in memory by default (also announced at startup). Define your own `AuditSink` bean to store them;
 any Countersign bean can be replaced the same way, and `Policy` beans are added to the configured policies.
+
+**`@RequiresApproval` in code.** The rule lives next to the tool it protects, so no configuration change can drop it.
+A configured `allow` cannot skip the approval, a configured `deny` still wins, and with no configured policy for the
+tool it is usable with approval even under the default `deny`. Countersign finds the annotation at startup by
+scanning your application's packages, so it also works for tool objects that are not beans
+(`.tools(new BankTools())`). On a method without `@Tool`, it stops the application instead of doing nothing.
 
 **Human approval.** A `require-approval` call waits for an `ApprovalGateway` bean, up to
 `countersign.approval.timeout`. Without a gateway it is denied at once, and startup warns about it. For an approval
@@ -248,7 +255,7 @@ wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Build
 - [x] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification
 - [x] `GuardedToolCallback` and automatic wrapping of `@Tool` methods
 - [x] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with a deny-on-timeout gateway
-- [ ] `@RequiresApproval`
+- [x] `@RequiresApproval`
 - [x] Spring Boot starter and startup banner line
 - [ ] In-memory and PostgreSQL audit sinks
 - [ ] Micrometer metrics and observations

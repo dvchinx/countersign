@@ -118,7 +118,9 @@ Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)               
   `ToolCallingManager` and `ToolCallbackResolver` beans, so every tool a `ChatClient` executes is
   guarded, however it was registered, and users do not change their `@Tool` methods (ADR 0006).
 - Annotations for per-tool policy, read at startup:
-  - `@RequiresApproval(reason = "...")`
+  - `@RequiresApproval(reason = "...")`: found by scanning the application's packages (ASM, no class
+    loading), so it covers tool objects that are not beans. Becomes a mandatory policy: it can only make
+    the decision stricter (ADR 0009).
   - `@ToolPolicy(id = "...")` to attach a named policy from configuration.
 
 ### Configuration (starter)
@@ -259,7 +261,7 @@ Done means: published to Maven Central as `0.1.0` with the banking demo and a re
 - [x] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification utility
 - [x] `countersign-spring-ai`: `GuardedToolCallback` + automatic wrapping of `@Tool` methods
 - [x] Decisions: ALLOW, DENY, REQUIRE_APPROVAL (with default deny-on-timeout gateway)
-- [ ] `@RequiresApproval` annotation
+- [x] `@RequiresApproval` annotation
 - [x] Starter: auto-config, `countersign.*` properties, startup banner line
 - [ ] `AuditSink`: in-memory + JDBC/PostgreSQL
 - [ ] Micrometer metrics and observations

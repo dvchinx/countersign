@@ -78,7 +78,7 @@ countersign:
 **3. Listo.** Tus herramientas existentes se envuelven automáticamente:
 
 ```java
-@Tool(description = "Transfer money between accounts")
+@Tool(name = "payments.transfer", description = "Transfer money between accounts")
 @RequiresApproval(reason = "Moves real money")   // opcional: política por herramienta como anotación
 public TransferResult transfer(String from, String to, BigDecimal amount) { ... }
 ```
@@ -177,6 +177,7 @@ Todas las propiedades viven bajo `countersign.*`. Para empezar solo necesitas `p
 | `countersign.audit.strict` | `false` | Rechaza la llamada si su recibo no se puede guardar. |
 | `countersign.audit.in-memory-capacity` | `10000` | Recibos que guarda el sink en memoria por defecto. |
 | `countersign.approval.timeout` | `2m` | Cuánto espera una llamada la respuesta de una persona antes de denegarse. |
+| `countersign.annotation-packages` | | Paquetes extra donde buscar `@RequiresApproval`; los paquetes de tu aplicación se escanean siempre. |
 
 Una política rota (sin herramientas, SpEL inválido, id duplicado) detiene la aplicación al arrancar con un mensaje
 que nombra la propiedad. Una errata nunca deja una herramienta sin proteger en silencio.
@@ -199,6 +200,13 @@ countersign:
 Por defecto los recibos se guardan en memoria (también se avisa al arrancar). Define tu propio bean `AuditSink` para
 guardarlos; cualquier bean de Countersign se reemplaza igual, y los beans `Policy` se suman a las políticas
 configuradas.
+
+**`@RequiresApproval` en el código.** La regla vive junto a la herramienta que protege, así que ningún cambio de
+configuración puede quitarla. Un `allow` configurado no puede saltarse la aprobación, un `deny` configurado sigue
+ganando, y si no hay ninguna política configurada para la herramienta, se puede usar con aprobación incluso con el
+`deny` por defecto. Countersign encuentra la anotación al arrancar escaneando los paquetes de tu aplicación, así que
+también funciona con objetos de herramientas que no son beans (`.tools(new BankTools())`). En un método sin `@Tool`,
+detiene la aplicación en lugar de no hacer nada.
 
 **Aprobación humana.** Una llamada `require-approval` espera la respuesta de un bean `ApprovalGateway`, como mucho
 `countersign.approval.timeout`. Sin gateway se deniega al momento, y al arrancar se avisa. Para una pantalla de
@@ -254,7 +262,7 @@ tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envu�
 - [x] Recibos: JSON canónico, cadena SHA-256, firma Ed25519, verificación
 - [x] `GuardedToolCallback` y envoltura automática de métodos `@Tool`
 - [x] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` con un gateway que deniega al vencer el tiempo
-- [ ] `@RequiresApproval`
+- [x] `@RequiresApproval`
 - [x] Starter de Spring Boot y línea de arranque en el log
 - [ ] Destinos de auditoría en memoria y PostgreSQL
 - [ ] Métricas y observaciones de Micrometer
