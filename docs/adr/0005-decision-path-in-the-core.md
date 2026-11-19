@@ -1,6 +1,6 @@
 # 5. The decision path lives in the core, and receipts come before execution
 
-- Status: Accepted
+- Status: Accepted; the approval step is refined by [ADR 0008](0008-human-approval.md)
 - Date: 2026-11-19
 
 ## Context

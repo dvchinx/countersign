@@ -89,12 +89,14 @@ Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)               
                           │     conversation id). Unreadable input → refused and recorded.
                           └─ ToolCallGuard.check(invocation) ──► Verdict           (countersign-core)
                                ├─ 2. PolicyEngine.evaluate(invocation) ──► EvaluationResult
-                               ├─ 3. ReceiptChain.append ──► signed Receipt (before the tool runs)
-                               ├─ 4. AuditSink.append(receipt) + Micrometer observation
-                               └─ 5. Apply decision:
-                                      ALLOW            → delegate to the real ToolCallback
-                                      DENY             → structured refusal to the model (no exception leak)
-                                      REQUIRE_APPROVAL → ApprovalGateway (default: deny on timeout)
+                               ├─ 3. REQUIRE_APPROVAL only: ApprovalGateway, wait up to the timeout;
+                               │     rejected / timed out / no gateway / error → refuse (ADR 0008)
+                               ├─ 4. ReceiptChain.append ──► signed Receipt, with approval outcome and
+                               │     approver (before the tool runs)
+                               ├─ 5. AuditSink.append(receipt) + Micrometer observation
+                               └─ 6. Apply decision:
+                                      ALLOW / approved → delegate to the real ToolCallback
+                                      DENY / not approved → structured refusal (no exception leak)
                                       REDACT           → Redactor transforms args and/or result, then delegate
 ```
 
@@ -105,8 +107,8 @@ Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)               
 - `Policy`: id, target tools (glob), condition, decision, priority.
 - `PolicyEngine`: evaluates policies in priority order; first match wins; if nothing matches,
   applies the configured default (`deny` by default).
-- `Receipt` (record): invocation id, tool, args HMAC-SHA256 (ADR 0004), decision, matched policy ids, timestamp,
-  `previousHash`, `hash`, `signature`.
+- `Receipt` (record): invocation id, tool, args HMAC-SHA256 (ADR 0004), decision, matched policy ids, approval
+  outcome and approver (ADR 0008), timestamp, `previousHash`, `hash`, `signature`.
 
 ### Integration points (spring-ai module)
 
@@ -256,7 +258,7 @@ Done means: published to Maven Central as `0.1.0` with the banking demo and a re
 - [x] `countersign-core`: model, `PolicyEngine` (first match wins, default decision), SpEL conditions with `SimpleEvaluationContext`
 - [x] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification utility
 - [x] `countersign-spring-ai`: `GuardedToolCallback` + automatic wrapping of `@Tool` methods
-- [ ] Decisions: ALLOW, DENY, REQUIRE_APPROVAL (with default deny-on-timeout gateway)
+- [x] Decisions: ALLOW, DENY, REQUIRE_APPROVAL (with default deny-on-timeout gateway)
 - [ ] `@RequiresApproval` annotation
 - [x] Starter: auto-config, `countersign.*` properties, startup banner line
 - [ ] `AuditSink`: in-memory + JDBC/PostgreSQL

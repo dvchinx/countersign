@@ -95,7 +95,7 @@ Al arrancar verás una línea en el log que indica que Countersign está activo 
 1. **Construye** un `ToolInvocation`: nombre de la herramienta, argumentos parseados, principal e id de conversación.
 2. **Evalúa** la invocación contra tus políticas, en orden de prioridad. Gana la primera que coincide; si ninguna coincide, se aplica la decisión por defecto (`deny`).
 3. **Aplica** la decisión: ejecuta la herramienta, la rechaza, le pregunta a un humano o redacta los datos.
-4. **Registra** un recibo: la decisión, las políticas que coincidieron, un hash con clave (HMAC-SHA256) de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
+4. **Registra** un recibo: la decisión, las políticas que coincidieron, quién la aprobó, un hash con clave (HMAC-SHA256) de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
 5. **Publica** el recibo en tu `AuditSink`, junto con métricas y observaciones de Micrometer.
 
 El control ocurre **donde se ejecuta la herramienta**, no en la lista de herramientas que se le envía
@@ -124,7 +124,7 @@ filtro de contenido, no en lugar de uno.
 - **Políticas declarativas:** globs de herramientas (`db.*`), prioridades y condiciones escritas en un
   SpEL aislado (`SimpleEvaluationContext`: sin referencias a tipos, sin acceso a beans, sin llamadas a métodos arbitrarios).
 - **Anotaciones:** `@RequiresApproval` y `@ToolPolicy(id = "...")` en tus métodos `@Tool`.
-- **Humano en el ciclo:** un `ApprovalGateway` intercambiable. El que viene por defecto deniega cuando la aprobación vence.
+- **Humano en el ciclo:** un `ApprovalGateway` intercambiable. Countersign espera hasta un plazo, deniega si nadie responde y guarda en el recibo quién aprobó.
 - **Recibos a prueba de manipulación:** JSON canónico, cadena de hashes SHA-256 y firmas Ed25519 usando solo
   `java.security`, más una utilidad de verificación que detecta cualquier recibo editado o borrado.
 - **Privacidad por defecto:** los recibos guardan un hash con clave (HMAC) de los argumentos, así que los valores no se pueden recuperar probando candidatos. Guardar los valores en crudo es opcional y pasa por un `Redactor`.
@@ -145,6 +145,8 @@ filtro de contenido, no en lugar de uno.
   "reason": "Moves real money",
   "basis": "POLICY_MATCHED",
   "matchedPolicies": ["transfers-need-approval"],
+  "approval": "APPROVED",
+  "approver": "bob",
   "principal": "alice",
   "conversationId": "conv-7",
   "timestamp": "2026-11-18T14:02:11.482Z",
@@ -174,6 +176,7 @@ Todas las propiedades viven bajo `countersign.*`. Para empezar solo necesitas `p
 | `countersign.receipts.stream-id` | nombre de la app + aleatorio | Id de la cadena de recibos de esta instancia. |
 | `countersign.audit.strict` | `false` | Rechaza la llamada si su recibo no se puede guardar. |
 | `countersign.audit.in-memory-capacity` | `10000` | Recibos que guarda el sink en memoria por defecto. |
+| `countersign.approval.timeout` | `2m` | Cuánto espera una llamada la respuesta de una persona antes de denegarse. |
 
 Una política rota (sin herramientas, SpEL inválido, id duplicado) detiene la aplicación al arrancar con un mensaje
 que nombra la propiedad. Una errata nunca deja una herramienta sin proteger en silencio.
@@ -196,6 +199,25 @@ countersign:
 Por defecto los recibos se guardan en memoria (también se avisa al arrancar). Define tu propio bean `AuditSink` para
 guardarlos; cualquier bean de Countersign se reemplaza igual, y los beans `Policy` se suman a las políticas
 configuradas.
+
+**Aprobación humana.** Una llamada `require-approval` espera la respuesta de un bean `ApprovalGateway`, como mucho
+`countersign.approval.timeout`. Sin gateway se deniega al momento, y al arrancar se avisa. Para una pantalla de
+aprobación dentro de tu app, usa el gateway en memoria y responde con la identidad del usuario autenticado:
+
+```java
+@Bean
+InMemoryApprovalGateway approvals() {
+    return new InMemoryApprovalGateway();
+}
+
+// En tu controlador de aprobaciones:
+approvals.pending();                                // llamadas en espera, con herramienta, argumentos y motivo
+approvals.approve(invocationId, currentUser());     // la herramienta se ejecuta; el recibo nombra a quien aprobó
+approvals.reject(invocationId, currentUser(), "Beneficiario desconocido");
+```
+
+La petición del agente espera mientras la aprobación está pendiente, así que el plazo debe ser menor que cualquier
+timeout HTTP que haya delante.
 
 **Qué queda protegido.** Toda herramienta que ejecute un `ChatClient` creado desde el `ChatClient.Builder`
 autoconfigurado, se haya registrado como se haya registrado: `.tools(misHerramientas)`, `defaultTools(...)`,
@@ -231,7 +253,7 @@ tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envu�
 - [x] `countersign-core`: modelo, `PolicyEngine`, condiciones SpEL aisladas
 - [x] Recibos: JSON canónico, cadena SHA-256, firma Ed25519, verificación
 - [x] `GuardedToolCallback` y envoltura automática de métodos `@Tool`
-- [ ] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` con un gateway que deniega al vencer el tiempo
+- [x] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` con un gateway que deniega al vencer el tiempo
 - [ ] `@RequiresApproval`
 - [x] Starter de Spring Boot y línea de arranque en el log
 - [ ] Destinos de auditoría en memoria y PostgreSQL

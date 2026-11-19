@@ -93,7 +93,7 @@ On startup you'll see one line telling you Countersign is active and which defau
 1. **Build** a `ToolInvocation`: tool name, parsed arguments, principal, conversation id.
 2. **Evaluate** it against your policies, in priority order. The first match wins; if nothing matches, the default (`deny`) applies.
 3. **Apply** the decision: run the tool, refuse it, ask a human, or redact it.
-4. **Record** a receipt: the decision, the matched policies, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
+4. **Record** a receipt: the decision, the matched policies, who approved it, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
 5. **Publish** it to your `AuditSink`, along with Micrometer metrics and observations.
 
 Enforcement happens **where the tool runs**, not in the list of tools sent to the model. A tool the
@@ -121,7 +121,7 @@ content filter, not instead of one.
 - **Declarative policies:** tool globs (`db.*`), priorities, and conditions written in a sandboxed SpEL
   (`SimpleEvaluationContext`: no type references, no bean access, no arbitrary method calls).
 - **Annotations:** `@RequiresApproval` and `@ToolPolicy(id = "...")` on your `@Tool` methods.
-- **Human in the loop:** a pluggable `ApprovalGateway`. The default denies when approval times out.
+- **Human in the loop:** a pluggable `ApprovalGateway`. Countersign waits up to a timeout, denies if nobody answers, and records the approver in the receipt.
 - **Tamper-evident receipts:** canonical JSON, a SHA-256 hash chain and Ed25519 signatures using only
   `java.security`, plus a verification utility that detects any edited or deleted receipt.
 - **Privacy by default:** receipts store a keyed hash (HMAC) of the arguments, so values cannot be recovered by guessing. Storing raw values is opt-in and goes through a `Redactor`.
@@ -142,6 +142,8 @@ content filter, not instead of one.
   "reason": "Moves real money",
   "basis": "POLICY_MATCHED",
   "matchedPolicies": ["transfers-need-approval"],
+  "approval": "APPROVED",
+  "approver": "bob",
   "principal": "alice",
   "conversationId": "conv-7",
   "timestamp": "2026-11-18T14:02:11.482Z",
@@ -171,6 +173,7 @@ All properties live under `countersign.*`. Only `policies` is needed to get star
 | `countersign.receipts.stream-id` | app name + random | Receipt chain id for this instance. |
 | `countersign.audit.strict` | `false` | Refuse the call when its receipt cannot be stored. |
 | `countersign.audit.in-memory-capacity` | `10000` | Receipts kept by the default in-memory sink. |
+| `countersign.approval.timeout` | `2m` | How long a call waits for a human answer before it is denied. |
 
 A broken policy (missing tool, bad SpEL, duplicate id) stops the application at startup with a message that names
 the property. A typo never leaves a tool silently unguarded.
@@ -192,6 +195,24 @@ countersign:
 
 Receipts are kept in memory by default (also announced at startup). Define your own `AuditSink` bean to store them;
 any Countersign bean can be replaced the same way, and `Policy` beans are added to the configured policies.
+
+**Human approval.** A `require-approval` call waits for an `ApprovalGateway` bean, up to
+`countersign.approval.timeout`. Without a gateway it is denied at once, and startup warns about it. For an approval
+screen inside your app, use the in-memory gateway and answer with the identity of the logged-in user:
+
+```java
+@Bean
+InMemoryApprovalGateway approvals() {
+    return new InMemoryApprovalGateway();
+}
+
+// In your approval controller:
+approvals.pending();                                // calls waiting, with tool, arguments and reason
+approvals.approve(invocationId, currentUser());     // the tool runs; the receipt names the approver
+approvals.reject(invocationId, currentUser(), "Unknown payee");
+```
+
+The agent's request waits while the approval is pending, so keep the timeout below any HTTP timeout in front of it.
 
 **What is guarded.** Every tool run by a `ChatClient` from the auto-configured `ChatClient.Builder`, however the tool
 was registered: `.tools(myTools)`, `defaultTools(...)`, `ToolCallbackProvider`s (MCP clients included), or Spring
@@ -226,7 +247,7 @@ wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Build
 - [x] `countersign-core`: model, `PolicyEngine`, sandboxed SpEL conditions
 - [x] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification
 - [x] `GuardedToolCallback` and automatic wrapping of `@Tool` methods
-- [ ] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with a deny-on-timeout gateway
+- [x] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with a deny-on-timeout gateway
 - [ ] `@RequiresApproval`
 - [x] Spring Boot starter and startup banner line
 - [ ] In-memory and PostgreSQL audit sinks

@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   strictly, checked and recorded before the tool runs, and refused calls return a structured JSON refusal to the
   model. The principal and conversation id come from the `ToolContext` (`countersign.principal`,
   `countersign.conversationId`).
+- Human approval ([ADR 0008](docs/adr/0008-human-approval.md)): the `ApprovalGateway` port, with
+  `InMemoryApprovalGateway` for approval screens in the same application. Countersign waits up to
+  `countersign.approval.timeout` and refuses the call if the answer is a rejection, never arrives, or cannot be
+  obtained. Receipts record the approval outcome and the approver. `ToolCallGuard` is now created with a builder.
 - `countersign-spring-boot-starter` ([ADR 0007](docs/adr/0007-starter-defaults.md)): auto-configuration and
   `countersign.*` properties. Policies are written in YAML with sandboxed SpEL conditions and checked at startup,
   with a failure analysis that names the broken property. A startup line reports the policies, the default
