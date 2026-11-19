@@ -154,6 +154,55 @@ filtro de contenido, no en lugar de uno.
 }
 ```
 
+## Configuración
+
+Todas las propiedades viven bajo `countersign.*`. Para empezar solo necesitas `policies`.
+
+| Propiedad | Valor por defecto | Qué hace |
+|---|---|---|
+| `countersign.enabled` | `true` | `false` desactiva Countersign; al arrancar se avisa de que las herramientas no están protegidas. |
+| `countersign.default-decision` | `deny` | Decisión cuando ninguna política coincide: `deny`, `allow` o `require-approval`. Cualquier valor distinto de `deny` genera un aviso. |
+| `countersign.default-reason` | `No policy allows this call` | Motivo que recibe el modelo cuando la decisión por defecto rechaza la llamada. |
+| `countersign.policies[n].id` | | Id único, se guarda en los recibos. |
+| `countersign.policies[n].tools` | | Globs de nombres de herramienta: `db.*`, `payments.transfer`. |
+| `countersign.policies[n].when` | siempre | SpEL aislado sobre `#args`, `#tool`, `#principal`, `#conversationId`. |
+| `countersign.policies[n].decision` | | `allow`, `deny` o `require-approval`. |
+| `countersign.policies[n].reason` | genérico | Se muestra al modelo (deny) o a quien aprueba (require-approval). |
+| `countersign.policies[n].priority` | `0` | El número más bajo se evalúa primero; los empates respetan el orden de la lista. |
+| `countersign.receipts.signing-key` | generada | Clave privada Ed25519, PKCS#8, Base64. |
+| `countersign.receipts.args-hmac-key` | generada | 32 o más bytes aleatorios, Base64, para el hash con clave de los argumentos. |
+| `countersign.receipts.stream-id` | nombre de la app + aleatorio | Id de la cadena de recibos de esta instancia. |
+| `countersign.audit.strict` | `false` | Rechaza la llamada si su recibo no se puede guardar. |
+| `countersign.audit.in-memory-capacity` | `10000` | Recibos que guarda el sink en memoria por defecto. |
+
+Una política rota (sin herramientas, SpEL inválido, id duplicado) detiene la aplicación al arrancar con un mensaje
+que nombra la propiedad. Una errata nunca deja una herramienta sin proteger en silencio.
+
+**Claves para producción.** Sin claves, Countersign las genera al arrancar y lo avisa. Los recibos de esa ejecución
+no se pueden verificar después de reiniciar. Genera claves reales una vez y pásalas como secretos:
+
+```bash
+openssl genpkey -algorithm ed25519 -outform DER | base64 -w0   # COUNTERSIGN_SIGNING_KEY
+openssl rand -base64 32                                         # COUNTERSIGN_ARGS_HMAC_KEY
+```
+
+```yaml
+countersign:
+  receipts:
+    signing-key: ${COUNTERSIGN_SIGNING_KEY}
+    args-hmac-key: ${COUNTERSIGN_ARGS_HMAC_KEY}
+```
+
+Por defecto los recibos se guardan en memoria (también se avisa al arrancar). Define tu propio bean `AuditSink` para
+guardarlos; cualquier bean de Countersign se reemplaza igual, y los beans `Policy` se suman a las políticas
+configuradas.
+
+**Qué queda protegido.** Toda herramienta que ejecute un `ChatClient` creado desde el `ChatClient.Builder`
+autoconfigurado, se haya registrado como se haya registrado: `.tools(misHerramientas)`, `defaultTools(...)`,
+`ToolCallbackProvider`s (incluidos clientes MCP) o la resolución por nombre de Spring AI. Un `ChatClient` que crees
+tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envuélvelo con
+`GuardedToolCallingManager.guard(...)` o inyecta `ChatClient.Builder`.
+
 ## Principios de diseño
 
 1. **Fail closed.** Si falla la evaluación de políticas, la aprobación, la firma o la auditoría, la llamada se deniega. Nunca se ejecuta una herramienta en silencio después de un error.
@@ -184,7 +233,7 @@ filtro de contenido, no en lugar de uno.
 - [x] `GuardedToolCallback` y envoltura automática de métodos `@Tool`
 - [ ] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` con un gateway que deniega al vencer el tiempo
 - [ ] `@RequiresApproval`
-- [ ] Starter de Spring Boot y línea de arranque en el log
+- [x] Starter de Spring Boot y línea de arranque en el log
 - [ ] Destinos de auditoría en memoria y PostgreSQL
 - [ ] Métricas y observaciones de Micrometer
 - [ ] Ejemplo `banking-agent` y GIF de demo

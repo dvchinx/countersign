@@ -258,7 +258,7 @@ Done means: published to Maven Central as `0.1.0` with the banking demo and a re
 - [x] `countersign-spring-ai`: `GuardedToolCallback` + automatic wrapping of `@Tool` methods
 - [ ] Decisions: ALLOW, DENY, REQUIRE_APPROVAL (with default deny-on-timeout gateway)
 - [ ] `@RequiresApproval` annotation
-- [ ] Starter: auto-config, `countersign.*` properties, startup banner line
+- [x] Starter: auto-config, `countersign.*` properties, startup banner line
 - [ ] `AuditSink`: in-memory + JDBC/PostgreSQL
 - [ ] Micrometer metrics and observations
 - [ ] Example `banking-agent` (blocks a large transfer, asks approval, shows receipt)

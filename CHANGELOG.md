@@ -22,6 +22,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   strictly, checked and recorded before the tool runs, and refused calls return a structured JSON refusal to the
   model. The principal and conversation id come from the `ToolContext` (`countersign.principal`,
   `countersign.conversationId`).
+- `countersign-spring-boot-starter` ([ADR 0007](docs/adr/0007-starter-defaults.md)): auto-configuration and
+  `countersign.*` properties. Policies are written in YAML with sandboxed SpEL conditions and checked at startup,
+  with a failure analysis that names the broken property. A startup line reports the policies, the default
+  decision, the receipt stream and the audit sink. Missing receipt keys are generated with a warning; every bean
+  can be replaced.
+- `InMemoryAuditSink`: the default audit sink, keeping the most recent receipts.
 - Automatic wrapping ([ADR 0006](docs/adr/0006-automatic-wrapping-via-tool-calling-manager.md)):
   `CountersignToolCallingBeanPostProcessor` decorates Spring AI's `ToolCallingManager` and `ToolCallbackResolver`
   beans with `GuardedToolCallingManager` and `GuardedToolCallbackResolver`, so tools passed with `.tools(...)`,

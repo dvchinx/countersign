@@ -151,6 +151,53 @@ content filter, not instead of one.
 }
 ```
 
+## Configuration
+
+All properties live under `countersign.*`. Only `policies` is needed to get started.
+
+| Property | Default | What it does |
+|---|---|---|
+| `countersign.enabled` | `true` | `false` turns Countersign off; startup logs a warning that tools are not guarded. |
+| `countersign.default-decision` | `deny` | Decision when no policy matches: `deny`, `allow` or `require-approval`. Anything but `deny` is logged as a warning. |
+| `countersign.default-reason` | `No policy allows this call` | Reason the model gets when the default decision refuses a call. |
+| `countersign.policies[n].id` | | Unique id, recorded in receipts. |
+| `countersign.policies[n].tools` | | Tool name globs: `db.*`, `payments.transfer`. |
+| `countersign.policies[n].when` | always | Sandboxed SpEL over `#args`, `#tool`, `#principal`, `#conversationId`. |
+| `countersign.policies[n].decision` | | `allow`, `deny` or `require-approval`. |
+| `countersign.policies[n].reason` | generic | Shown to the model (deny) or the approver (require-approval). |
+| `countersign.policies[n].priority` | `0` | Lower runs first; ties keep the order listed. |
+| `countersign.receipts.signing-key` | generated | Ed25519 private key, PKCS#8, Base64. |
+| `countersign.receipts.args-hmac-key` | generated | 32+ random bytes, Base64, for the keyed hash of arguments. |
+| `countersign.receipts.stream-id` | app name + random | Receipt chain id for this instance. |
+| `countersign.audit.strict` | `false` | Refuse the call when its receipt cannot be stored. |
+| `countersign.audit.in-memory-capacity` | `10000` | Receipts kept by the default in-memory sink. |
+
+A broken policy (missing tool, bad SpEL, duplicate id) stops the application at startup with a message that names
+the property. A typo never leaves a tool silently unguarded.
+
+**Keys for production.** Without keys, Countersign generates them at startup and says so in a warning. Receipts
+from that run cannot be verified after a restart. Generate real keys once and pass them as secrets:
+
+```bash
+openssl genpkey -algorithm ed25519 -outform DER | base64 -w0   # COUNTERSIGN_SIGNING_KEY
+openssl rand -base64 32                                         # COUNTERSIGN_ARGS_HMAC_KEY
+```
+
+```yaml
+countersign:
+  receipts:
+    signing-key: ${COUNTERSIGN_SIGNING_KEY}
+    args-hmac-key: ${COUNTERSIGN_ARGS_HMAC_KEY}
+```
+
+Receipts are kept in memory by default (also announced at startup). Define your own `AuditSink` bean to store them;
+any Countersign bean can be replaced the same way, and `Policy` beans are added to the configured policies.
+
+**What is guarded.** Every tool run by a `ChatClient` from the auto-configured `ChatClient.Builder`, however the tool
+was registered: `.tools(myTools)`, `defaultTools(...)`, `ToolCallbackProvider`s (MCP clients included), or Spring
+AI's resolution by name. A `ChatClient` you build yourself with `ChatClient.create(model)` has its own tool manager:
+wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Builder` instead.
+
 ## Design principles
 
 1. **Fail closed.** If policy evaluation, approval, signing or auditing fails, the call is denied. A tool is never run silently after an error.
@@ -181,7 +228,7 @@ content filter, not instead of one.
 - [x] `GuardedToolCallback` and automatic wrapping of `@Tool` methods
 - [ ] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with a deny-on-timeout gateway
 - [ ] `@RequiresApproval`
-- [ ] Spring Boot starter and startup banner line
+- [x] Spring Boot starter and startup banner line
 - [ ] In-memory and PostgreSQL audit sinks
 - [ ] Micrometer metrics and observations
 - [ ] `banking-agent` example and demo GIF

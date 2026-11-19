@@ -27,5 +27,5 @@ audit store could hash every candidate and find the real values, which defeats t
 - Whoever holds the key can still confirm that a given set of arguments matches a receipt (for example, during an
   investigation), by recomputing the HMAC.
 - Losing the key does not affect chain or signature verification; it only makes argument matching impossible.
-- Applications need a second secret. The starter will fail at startup if it is missing, rather than fall back to a
-  plain hash.
+- Applications need a second secret. If it is missing, the starter generates a random key at startup and warns
+  (ADR 0007); it never falls back to a plain hash.
