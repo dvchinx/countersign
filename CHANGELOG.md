@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `banking-agent` example: an agent with balance, transfer and SQL tools over an in-memory bank, guarded with no
+  Countersign code in the agent. Transfers above $1,000 wait for a second person through an HTTP approval screen
+  (requesters cannot approve their own calls), destructive SQL is denied, receipts can be listed and verified, and
+  metrics are exposed through Actuator. A scripted demo model makes it run with no API key.
 - Metrics and tracing ([ADR 0011](docs/adr/0011-decision-listeners-and-micrometer.md)): the `DecisionListener` port
   and `DecisionEvent` in the core report every decision without its arguments; `MicrometerDecisionListener` publishes
   `countersign.decisions`, `countersign.evaluation` and `countersign.audit.failures`; `ObservationDecisionListener`

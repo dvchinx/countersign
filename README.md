@@ -43,6 +43,10 @@ Think of it as **Spring Security for agent tool calls**. It works with Spring AI
 The model never sees a stack trace. It gets a structured refusal it can explain to the user, and
 you get a receipt you can verify later.
 
+Try it yourself in two minutes, with no API key and no Docker: `./mvnw -pl examples/banking-agent -am install
+-DskipTests && ./mvnw -pl examples/banking-agent spring-boot:run`, then follow the
+[example's walkthrough](examples/banking-agent/README.md).
+
 ## Quickstart
 
 > **Pre-alpha:** this is the API we are building toward `0.1.0`. Watch the repo to know when it lands.
@@ -293,7 +297,8 @@ wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Build
 - [x] Spring Boot starter and startup banner line
 - [x] In-memory and PostgreSQL audit sinks
 - [x] Micrometer metrics and observations
-- [ ] `banking-agent` example and demo GIF
+- [x] `banking-agent` example
+- [ ] Demo GIF
 - [ ] Published to Maven Central
 
 Not planned for `0.1.0`: LLM-based classifiers, a UI dashboard, non-Spring frameworks, A2A, or a remote policy server.

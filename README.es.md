@@ -45,6 +45,10 @@ herramientas.
 El modelo nunca ve un stack trace. Recibe un rechazo estructurado que puede explicarle al usuario,
 y tú obtienes un recibo que puedes verificar después.
 
+Pruébalo en dos minutos, sin API key y sin Docker: `./mvnw -pl examples/banking-agent -am install -DskipTests &&
+./mvnw -pl examples/banking-agent spring-boot:run`, y sigue el [recorrido del ejemplo](examples/banking-agent/README.md)
+(en inglés).
+
 ## Inicio rápido
 
 > **Pre-alpha:** esta es la API que estamos construyendo para la `0.1.0`. Dale *Watch* al repo para enterarte cuando salga.
@@ -299,7 +303,8 @@ tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envu�
 - [x] Starter de Spring Boot y línea de arranque en el log
 - [x] Destinos de auditoría en memoria y PostgreSQL
 - [x] Métricas y observaciones de Micrometer
-- [ ] Ejemplo `banking-agent` y GIF de demo
+- [x] Ejemplo `banking-agent`
+- [ ] GIF de demo
 - [ ] Publicado en Maven Central
 
 No está previsto para la `0.1.0`: clasificadores basados en LLM, un panel web, frameworks que no sean Spring, A2A ni un servidor remoto de políticas.

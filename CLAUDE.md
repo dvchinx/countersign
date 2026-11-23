@@ -266,7 +266,7 @@ Done means: published to Maven Central as `0.1.0` with the banking demo and a re
 - [x] Starter: auto-config, `countersign.*` properties, startup banner line
 - [x] `AuditSink`: in-memory + JDBC/PostgreSQL
 - [x] Micrometer metrics and observations
-- [ ] Example `banking-agent` (blocks a large transfer, asks approval, shows receipt)
+- [x] Example `banking-agent` (blocks a large transfer, asks approval, shows receipt)
 - [ ] README with quickstart, GIF, comparison table
 
 Out of scope for MVP (do not start without discussion): LLM-based classifiers, UI dashboard,
