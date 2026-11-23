@@ -1,3 +1,35 @@
 spring:
   application:
-    name: countersign-example-banking-agent
+    name: banking-agent
+  threads:
+    virtual:
+      enabled: true          # a chat request may wait minutes for a human; don't hold a platform thread
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics
+
+countersign:
+  default-decision: deny     # fail closed: anything no policy allows is refused
+  approval:
+    timeout: 60s             # keep it below any HTTP timeout in front of /chat
+  policies:
+    - id: no-destructive-sql
+      tools: ["db.*"]
+      when: "#args['query'] matches '(?i).*\\b(drop|truncate|delete)\\b.*'"
+      decision: deny
+      reason: "Destructive SQL is not allowed from agents"
+    - id: sql-reads
+      tools: ["db.*"]
+      when: "#args['query'] matches '(?is)\\s*select\\b.*'"
+      decision: allow
+    - id: transfers-need-approval
+      tools: ["payments.transfer"]
+      when: "#args['amount'] > 1000"
+      decision: require-approval
+      reason: "Transfers above $1,000 need a second person"
+    - id: everyday-banking
+      tools: ["accounts.balance", "payments.transfer"]
+      decision: allow
