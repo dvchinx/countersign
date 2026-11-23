@@ -252,6 +252,9 @@ public class CountersignProperties {
         // A literal, not InMemoryAuditSink.DEFAULT_CAPACITY, so the configuration metadata shows the default.
         private int inMemoryCapacity = 10_000;
 
+        /** The PostgreSQL audit sink, used when countersign-audit-jdbc is on the classpath and a DataSource exists. */
+        private Jdbc jdbc = new Jdbc();
+
         public boolean isStrict() {
             return strict;
         }
@@ -266,6 +269,32 @@ public class CountersignProperties {
 
         public void setInMemoryCapacity(int inMemoryCapacity) {
             this.inMemoryCapacity = inMemoryCapacity;
+        }
+
+        public Jdbc getJdbc() {
+            return jdbc;
+        }
+
+        public void setJdbc(Jdbc jdbc) {
+            this.jdbc = jdbc;
+        }
+    }
+
+    /** PostgreSQL audit sink settings. */
+    public static class Jdbc {
+
+        /**
+         * Create the countersign_receipt table and its append-only triggers at startup if the table does not exist.
+         * Turn off when the schema is managed by Flyway or Liquibase.
+         */
+        private boolean initializeSchema = true;
+
+        public boolean isInitializeSchema() {
+            return initializeSchema;
+        }
+
+        public void setInitializeSchema(boolean initializeSchema) {
+            this.initializeSchema = initializeSchema;
         }
     }
 }

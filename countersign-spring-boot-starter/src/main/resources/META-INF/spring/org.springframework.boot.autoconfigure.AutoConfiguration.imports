@@ -1,1 +1,2 @@
 io.github.dvchinx.countersign.autoconfigure.CountersignAutoConfiguration
+io.github.dvchinx.countersign.autoconfigure.CountersignJdbcAuditAutoConfiguration
