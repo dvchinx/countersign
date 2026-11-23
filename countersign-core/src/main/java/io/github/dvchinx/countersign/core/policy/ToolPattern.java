@@ -4,10 +4,10 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * A glob that selects tools by name, such as {@code db.*} or {@code payments.transfer}.
+ * A glob that selects tools by name, such as {@code db_*} or {@code payments_transfer}.
  *
- * <p>The only wildcard is {@code *}, which matches any run of characters, dots included: {@code db.*} matches
- * {@code db.query} and {@code db.admin.drop}. Every other character, {@code ?} included, matches itself, and
+ * <p>The only wildcard is {@code *}, which matches any run of characters, separators included: {@code db_*} matches
+ * {@code db_query} and {@code db_admin_drop}, and {@code github.*} matches the dotted names some MCP servers use. Every other character, {@code ?} included, matches itself, and
  * matching is case-sensitive. Keeping the syntax this small means a pattern means the same thing to everyone who
  * reads it.
  */
@@ -24,7 +24,7 @@ public final class ToolPattern {
     /**
      * Parses a glob.
      *
-     * @param glob the glob, for example {@code db.*}
+     * @param glob the glob, for example {@code db_*}
      * @return the pattern
      * @throws InvalidPolicyException if the glob is blank or contains whitespace
      */

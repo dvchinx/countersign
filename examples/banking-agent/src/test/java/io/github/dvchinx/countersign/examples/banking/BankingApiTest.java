@@ -65,7 +65,7 @@ class BankingApiTest {
         String id = awaitPendingId();
 
         assertThat(mvc.get().uri("/approvals")).hasStatusOk().bodyJson().satisfies(json -> {
-            json.assertThat().extractingPath("$[0].tool").isEqualTo("payments.transfer");
+            json.assertThat().extractingPath("$[0].tool").isEqualTo("payments_transfer");
             json.assertThat().extractingPath("$[0].arguments.to").isEqualTo("ACME Corp");
             json.assertThat().extractingPath("$[0].requestedBy").isEqualTo("alice");
         });

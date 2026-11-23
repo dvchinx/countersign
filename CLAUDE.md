@@ -136,12 +136,12 @@ countersign:
     args-hmac-key: ${COUNTERSIGN_ARGS_HMAC_KEY}  # >= 32 random bytes, base64; keep it out of the audit store
   policies:
     - id: no-destructive-sql
-      tools: ["db.*"]
+      tools: ["db_*"]
       when: "#args['query'] matches '(?i).*\\b(drop|truncate|delete)\\b.*'"
       decision: deny
       reason: "Destructive SQL is not allowed from agents"
     - id: transfers-need-approval
-      tools: ["payments.transfer"]
+      tools: ["payments_transfer"]
       when: "#args['amount'] > 1000"
       decision: require-approval
 ```

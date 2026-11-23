@@ -69,7 +69,7 @@ class ReadmeQuickstartTest {
 
     @Test
     void deniesDestructiveSql() {
-        ScriptedChatModel model = new ScriptedChatModel("db.query", "{\"query\":\"DROP TABLE accounts\"}");
+        ScriptedChatModel model = new ScriptedChatModel("db_query", "{\"query\":\"DROP TABLE accounts\"}");
 
         runner(model).run(context -> {
             ask(context);
@@ -82,7 +82,7 @@ class ReadmeQuickstartTest {
 
     @Test
     void sendsLargeTransfersForApproval() {
-        ScriptedChatModel model = new ScriptedChatModel("payments.transfer", "{\"to\":\"ACME\",\"amount\":5000}");
+        ScriptedChatModel model = new ScriptedChatModel("payments_transfer", "{\"to\":\"ACME\",\"amount\":5000}");
 
         runner(model).run(context -> {
             ask(context);
@@ -94,7 +94,7 @@ class ReadmeQuickstartTest {
 
     @Test
     void deniesWhatNoPolicyAllows() {
-        ScriptedChatModel model = new ScriptedChatModel("payments.transfer", "{\"to\":\"ACME\",\"amount\":50}");
+        ScriptedChatModel model = new ScriptedChatModel("payments_transfer", "{\"to\":\"ACME\",\"amount\":50}");
 
         runner(model).run(context -> {
             ask(context);

@@ -20,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * The agent's tools: plain Spring AI {@code @Tool} methods with no Countersign code in them.
  *
- * <p>They really change the in-memory bank. {@code db.query} runs whatever SQL it is given, so a {@code DROP TABLE}
+ * <p>They really change the in-memory bank. {@code db_query} runs whatever SQL it is given, so a {@code DROP TABLE}
  * would drop the table: what stops it is the {@code no-destructive-sql} policy, not the tool.
  */
 @Component
@@ -42,7 +42,7 @@ public class BankTools {
      * @param account the account id
      * @return the balance, as a sentence for the model
      */
-    @Tool(name = "accounts.balance", description = "Get the balance of one of the customer's accounts")
+    @Tool(name = "accounts_balance", description = "Get the balance of one of the customer's accounts")
     public String balance(@ToolParam(description = "Account id: checking or savings") String account) {
         List<BigDecimal> balance =
                 jdbc.queryForList("SELECT balance FROM accounts WHERE id = ?", BigDecimal.class, account);
@@ -60,7 +60,7 @@ public class BankTools {
      * @return what happened, as a sentence for the model
      */
     @Tool(
-            name = "payments.transfer",
+            name = "payments_transfer",
             description = "Transfer money from one of the customer's accounts to another account or a payee")
     public String transfer(
             @ToolParam(description = "Account to debit: checking or savings") String from,
@@ -94,7 +94,7 @@ public class BankTools {
      * @param query the statement
      * @return the first rows, or how many rows changed
      */
-    @Tool(name = "db.query", description = "Run a SQL statement against the bank database")
+    @Tool(name = "db_query", description = "Run a SQL statement against the bank database")
     public String query(@ToolParam(description = "One SQL statement") String query) {
         try {
             return jdbc.execute((StatementCallback<String>) statement -> statement.execute(query)

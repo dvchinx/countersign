@@ -85,11 +85,11 @@ final class DemoChatModel implements ChatModel {
         }
         String text = request.strip();
         if (SQL.matcher(text).matches()) {
-            return Optional.of(new PlannedCall("db.query", Map.of("query", text.replaceAll(";\\s*$", ""))));
+            return Optional.of(new PlannedCall("db_query", Map.of("query", text.replaceAll(";\\s*$", ""))));
         }
         Matcher drop = DROP_TABLE.matcher(text);
         if (drop.find()) {
-            return Optional.of(new PlannedCall("db.query", Map.of("query", "DROP TABLE " + drop.group(1))));
+            return Optional.of(new PlannedCall("db_query", Map.of("query", "DROP TABLE " + drop.group(1))));
         }
         Matcher amount = AMOUNT.matcher(text);
         Matcher to = TO.matcher(text);
@@ -99,15 +99,15 @@ final class DemoChatModel implements ChatModel {
             arguments.put("from", from.find() ? from.group(1).toLowerCase(Locale.ROOT) : "checking");
             arguments.put("to", to.group(1).strip());
             arguments.put("amount", new BigDecimal(amount.group(1).replace(",", "")));
-            return Optional.of(new PlannedCall("payments.transfer", arguments));
+            return Optional.of(new PlannedCall("payments_transfer", arguments));
         }
         if (BALANCE.matcher(text).find()) {
             String account = text.toLowerCase(Locale.ROOT).contains("savings") ? "savings" : "checking";
-            return Optional.of(new PlannedCall("accounts.balance", Map.of("account", account)));
+            return Optional.of(new PlannedCall("accounts_balance", Map.of("account", account)));
         }
         if (LIST_TRANSACTIONS.matcher(text).find()) {
             return Optional.of(
-                    new PlannedCall("db.query", Map.of("query", "SELECT * FROM transactions ORDER BY id DESC")));
+                    new PlannedCall("db_query", Map.of("query", "SELECT * FROM transactions ORDER BY id DESC")));
         }
         return Optional.empty();
     }

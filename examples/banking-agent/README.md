@@ -48,7 +48,7 @@ curl -s localhost:8080/chat -H 'X-User: alice' -H 'Content-Type: application/jso
 
 ```bash
 curl -s localhost:8080/approvals
-# [{"invocationId":"ceeb4850-…","tool":"payments.transfer",
+# [{"invocationId":"ceeb4850-…","tool":"payments_transfer",
 #   "arguments":{"from":"checking","to":"ACME Corp","amount":5000},
 #   "reason":"Transfers above $1,000 need a second person","requestedBy":"alice","deadline":"…"}]
 ```
@@ -94,12 +94,10 @@ policy required it, and holds a keyed hash of the arguments, never the values.
 Replace the `demoChatModel` bean in
 [`BankingAgentApplication`](src/main/java/io/github/dvchinx/countersign/examples/banking/BankingAgentApplication.java)
 with a Spring AI model starter (for example `spring-ai-starter-model-openai` or `spring-ai-starter-model-anthropic`)
-and its API key. Two things to know:
+and its API key. The tool names already use only letters, digits and `_`, which is what OpenAI and Anthropic accept.
 
-- OpenAI and Anthropic only accept tool names made of letters, digits, `_` and `-`. Rename the tools
-  (`payments_transfer`, `accounts_balance`, `db_query`) and the `tools:` globs in `application.yml` to match.
-- A real model decides on its own which tools to call and with which arguments. The policies do not change: that is
-  the point.
+A real model decides on its own which tools to call and with which arguments. The policies do not change: that is
+the point.
 
 ## What is demo-only
 

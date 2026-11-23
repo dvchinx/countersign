@@ -83,7 +83,7 @@ class BankingAgentTest {
         assertThat(ask("What's my savings balance?")).startsWith("The savings balance is $");
 
         assertThat(lastReceipt()).satisfies(receipt -> {
-            assertThat(receipt.tool()).isEqualTo("accounts.balance");
+            assertThat(receipt.tool()).isEqualTo("accounts_balance");
             assertThat(receipt.decision()).isEqualTo(Decision.Type.ALLOW);
             assertThat(receipt.matchedPolicies()).containsExactly("everyday-banking");
             assertThat(receipt.principal()).isEqualTo("alice");
@@ -108,7 +108,7 @@ class BankingAgentTest {
         CompletableFuture<String> answer = askInBackground("Move $5,000 from checking to ACME Corp.");
         ApprovalRequest pending = awaitPendingApproval();
 
-        assertThat(pending.invocation().toolName()).isEqualTo("payments.transfer");
+        assertThat(pending.invocation().toolName()).isEqualTo("payments_transfer");
         assertThat(pending.reason()).isEqualTo("Transfers above $1,000 need a second person");
         assertThat(answer).isNotDone();
         assertThat(balance("checking")).isEqualByComparingTo(before);
@@ -150,7 +150,7 @@ class BankingAgentTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transactions", Integer.class))
                 .isPositive();
         assertThat(lastReceipt()).satisfies(receipt -> {
-            assertThat(receipt.tool()).isEqualTo("db.query");
+            assertThat(receipt.tool()).isEqualTo("db_query");
             assertThat(receipt.decision()).isEqualTo(Decision.Type.DENY);
             assertThat(receipt.matchedPolicies()).containsExactly("no-destructive-sql");
         });

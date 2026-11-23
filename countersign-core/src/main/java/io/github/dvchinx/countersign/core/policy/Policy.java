@@ -87,7 +87,7 @@ public record Policy(String id, List<ToolPattern> tools, Condition condition, De
         /**
          * Adds tool patterns.
          *
-         * @param globs globs such as {@code db.*}
+         * @param globs globs such as {@code db_*}
          * @return this builder
          * @throws InvalidPolicyException if a glob is not valid
          */

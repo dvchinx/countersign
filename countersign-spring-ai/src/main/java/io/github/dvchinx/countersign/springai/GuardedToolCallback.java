@@ -33,7 +33,7 @@ import org.springframework.ai.tool.metadata.ToolMetadata;
  *
  * <p>A refusal is returned to the model as a small JSON object it can explain to the user, for example
  * {@code {"decision":"DENY","invocationId":"…","reason":"Destructive SQL is not allowed from agents",
- * "status":"REFUSED","tool":"db.query"}}. It never contains a stack trace, argument values or internal errors. Any
+ * "status":"REFUSED","tool":"db_query"}}. It never contains a stack trace, argument values or internal errors. Any
  * unexpected failure in Countersign is also a refusal (fail closed). Exceptions thrown by the tool itself are passed
  * on untouched, as if Countersign were not there.
  *

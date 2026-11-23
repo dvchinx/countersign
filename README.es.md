@@ -70,11 +70,11 @@ countersign:
   default-decision: deny                 # fail closed: todo lo que no esté permitido se bloquea
   policies:
     - id: no-destructive-sql
-      tools: ["db.*"]
+      tools: ["db_*"]
       when: "#args['query'] matches '(?i).*\\b(drop|truncate|delete)\\b.*'"
       decision: deny
     - id: transfers-need-approval
-      tools: ["payments.transfer"]
+      tools: ["payments_transfer"]
       when: "#args['amount'] > 1000"
       decision: require-approval
 ```
@@ -82,7 +82,7 @@ countersign:
 **3. Listo.** Tus herramientas existentes se envuelven automáticamente:
 
 ```java
-@Tool(name = "payments.transfer", description = "Transfer money between accounts")
+@Tool(name = "payments_transfer", description = "Transfer money between accounts")
 @RequiresApproval(reason = "Moves real money")   // opcional: política por herramienta como anotación
 public TransferResult transfer(String from, String to, BigDecimal amount) { ... }
 ```
@@ -125,7 +125,7 @@ filtro de contenido, no en lugar de uno.
 ## Funcionalidades
 
 - **Cuatro decisiones:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`, `REDACT`.
-- **Políticas declarativas:** globs de herramientas (`db.*`), prioridades y condiciones escritas en un
+- **Políticas declarativas:** globs de herramientas (`db_*`), prioridades y condiciones escritas en un
   SpEL aislado (`SimpleEvaluationContext`: sin referencias a tipos, sin acceso a beans, sin llamadas a métodos arbitrarios).
 - **Anotaciones:** `@RequiresApproval` y `@ToolPolicy(id = "...")` en tus métodos `@Tool`.
 - **Humano en el ciclo:** un `ApprovalGateway` intercambiable. Countersign espera hasta un plazo, deniega si nadie responde y guarda en el recibo quién aprobó.
@@ -144,7 +144,7 @@ filtro de contenido, no en lugar de uno.
   "streamId": "banking-agent-7c1e",
   "sequence": 42,
   "invocationId": "3f6c2a9e-8d41-4b7a-9f0e-5c2d1b8a7e64",
-  "tool": "payments.transfer",
+  "tool": "payments_transfer",
   "argsHmac": "9b2f4c…e71a",
   "decision": "REQUIRE_APPROVAL",
   "reason": "Moves real money",
@@ -171,7 +171,7 @@ Todas las propiedades viven bajo `countersign.*`. Para empezar solo necesitas `p
 | `countersign.default-decision` | `deny` | Decisión cuando ninguna política coincide: `deny`, `allow` o `require-approval`. Cualquier valor distinto de `deny` genera un aviso. |
 | `countersign.default-reason` | `No policy allows this call` | Motivo que recibe el modelo cuando la decisión por defecto rechaza la llamada. |
 | `countersign.policies[n].id` | | Id único, se guarda en los recibos. |
-| `countersign.policies[n].tools` | | Globs de nombres de herramienta: `db.*`, `payments.transfer`. |
+| `countersign.policies[n].tools` | | Globs de nombres de herramienta: `db_*`, `payments_transfer`. |
 | `countersign.policies[n].when` | siempre | SpEL aislado sobre `#args`, `#tool`, `#principal`, `#conversationId`. |
 | `countersign.policies[n].decision` | | `allow`, `deny` o `require-approval`. |
 | `countersign.policies[n].reason` | genérico | Se muestra al modelo (deny) o a quien aprueba (require-approval). |
@@ -187,6 +187,11 @@ Todas las propiedades viven bajo `countersign.*`. Para empezar solo necesitas `p
 
 Una política rota (sin herramientas, SpEL inválido, id duplicado) detiene la aplicación al arrancar con un mensaje
 que nombra la propiedad. Una errata nunca deja una herramienta sin proteger en silencio.
+
+**Nombres de herramientas.** OpenAI y Anthropic solo aceptan nombres de herramienta con letras, dígitos, `_` y `-`
+(hasta 64 caracteres), así que llama a una herramienta `payments_transfer`, no `payments.transfer`. Countersign acepta
+cualquier nombre, incluidos los nombres con puntos de algunos servidores MCP, y `*` en un glob abarca cualquier
+carácter.
 
 **Claves para producción.** Sin claves, Countersign las genera al arrancar y lo avisa. Los recibos de esa ejecución
 no se pueden verificar después de reiniciar. Genera claves reales una vez y pásalas como secretos:

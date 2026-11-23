@@ -68,11 +68,11 @@ countersign:
   default-decision: deny                 # fail closed: anything not allowed is blocked
   policies:
     - id: no-destructive-sql
-      tools: ["db.*"]
+      tools: ["db_*"]
       when: "#args['query'] matches '(?i).*\\b(drop|truncate|delete)\\b.*'"
       decision: deny
     - id: transfers-need-approval
-      tools: ["payments.transfer"]
+      tools: ["payments_transfer"]
       when: "#args['amount'] > 1000"
       decision: require-approval
 ```
@@ -80,7 +80,7 @@ countersign:
 **3. That's it.** Your existing tools are wrapped automatically:
 
 ```java
-@Tool(name = "payments.transfer", description = "Transfer money between accounts")
+@Tool(name = "payments_transfer", description = "Transfer money between accounts")
 @RequiresApproval(reason = "Moves real money")   // optional: per-tool policy as an annotation
 public TransferResult transfer(String from, String to, BigDecimal amount) { ... }
 ```
@@ -122,7 +122,7 @@ content filter, not instead of one.
 ## Features
 
 - **Four decisions:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`, `REDACT`.
-- **Declarative policies:** tool globs (`db.*`), priorities, and conditions written in a sandboxed SpEL
+- **Declarative policies:** tool globs (`db_*`), priorities, and conditions written in a sandboxed SpEL
   (`SimpleEvaluationContext`: no type references, no bean access, no arbitrary method calls).
 - **Annotations:** `@RequiresApproval` and `@ToolPolicy(id = "...")` on your `@Tool` methods.
 - **Human in the loop:** a pluggable `ApprovalGateway`. Countersign waits up to a timeout, denies if nobody answers, and records the approver in the receipt.
@@ -141,7 +141,7 @@ content filter, not instead of one.
   "streamId": "banking-agent-7c1e",
   "sequence": 42,
   "invocationId": "3f6c2a9e-8d41-4b7a-9f0e-5c2d1b8a7e64",
-  "tool": "payments.transfer",
+  "tool": "payments_transfer",
   "argsHmac": "9b2f4c…e71a",
   "decision": "REQUIRE_APPROVAL",
   "reason": "Moves real money",
@@ -168,7 +168,7 @@ All properties live under `countersign.*`. Only `policies` is needed to get star
 | `countersign.default-decision` | `deny` | Decision when no policy matches: `deny`, `allow` or `require-approval`. Anything but `deny` is logged as a warning. |
 | `countersign.default-reason` | `No policy allows this call` | Reason the model gets when the default decision refuses a call. |
 | `countersign.policies[n].id` | | Unique id, recorded in receipts. |
-| `countersign.policies[n].tools` | | Tool name globs: `db.*`, `payments.transfer`. |
+| `countersign.policies[n].tools` | | Tool name globs: `db_*`, `payments_transfer`. |
 | `countersign.policies[n].when` | always | Sandboxed SpEL over `#args`, `#tool`, `#principal`, `#conversationId`. |
 | `countersign.policies[n].decision` | | `allow`, `deny` or `require-approval`. |
 | `countersign.policies[n].reason` | generic | Shown to the model (deny) or the approver (require-approval). |
@@ -184,6 +184,10 @@ All properties live under `countersign.*`. Only `policies` is needed to get star
 
 A broken policy (missing tool, bad SpEL, duplicate id) stops the application at startup with a message that names
 the property. A typo never leaves a tool silently unguarded.
+
+**Tool names.** OpenAI and Anthropic only accept tool names made of letters, digits, `_` and `-` (up to 64
+characters), so name a tool `payments_transfer`, not `payments.transfer`. Countersign accepts any name, including the
+dotted names some MCP servers use, and `*` in a glob matches any characters.
 
 **Keys for production.** Without keys, Countersign generates them at startup and says so in a warning. Receipts
 from that run cannot be verified after a restart. Generate real keys once and pass them as secrets:

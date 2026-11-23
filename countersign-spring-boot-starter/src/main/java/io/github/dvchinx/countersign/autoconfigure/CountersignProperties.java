@@ -132,7 +132,7 @@ public class CountersignProperties {
         /** Unique id, recorded in receipts and metrics. Letters, digits, '.', '_' and '-'. */
         private @Nullable String id;
 
-        /** Tool name globs this policy applies to, such as {@code db.*}. At least one. */
+        /** Tool name globs this policy applies to, such as {@code db_*}. At least one. */
         private List<String> tools = new ArrayList<>();
 
         /**

@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  * <p>{@link #toString()} lists argument names only, never values (design principle 3).
  *
  * @param id unique id of this invocation, carried into its receipt
- * @param toolName the tool's name as the model called it, for example {@code payments.transfer}
+ * @param toolName the tool's name as the model called it, for example {@code payments_transfer}
  * @param arguments the parsed arguments
  * @param principal who the agent acts for, or {@code null} if the adapter does not know
  * @param conversationId the conversation the call belongs to, or {@code null} if the adapter does not know

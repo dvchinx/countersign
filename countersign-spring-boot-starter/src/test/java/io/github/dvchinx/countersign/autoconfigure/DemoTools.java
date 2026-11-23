@@ -9,13 +9,13 @@ class DemoTools {
     int transfers;
     int queries;
 
-    @Tool(name = "payments.transfer", description = "Transfer money to another account")
+    @Tool(name = "payments_transfer", description = "Transfer money to another account")
     String transfer(String to, BigDecimal amount) {
         transfers++;
         return "Transferred " + amount + " to " + to;
     }
 
-    @Tool(name = "db.query", description = "Run a SQL query")
+    @Tool(name = "db_query", description = "Run a SQL query")
     String query(String query) {
         queries++;
         return "3 rows";

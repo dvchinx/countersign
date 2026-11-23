@@ -17,19 +17,19 @@ countersign:
     timeout: 60s             # keep it below any HTTP timeout in front of /chat
   policies:
     - id: no-destructive-sql
-      tools: ["db.*"]
+      tools: ["db_*"]
       when: "#args['query'] matches '(?i).*\\b(drop|truncate|delete)\\b.*'"
       decision: deny
       reason: "Destructive SQL is not allowed from agents"
     - id: sql-reads
-      tools: ["db.*"]
+      tools: ["db_*"]
       when: "#args['query'] matches '(?is)\\s*select\\b.*'"
       decision: allow
     - id: transfers-need-approval
-      tools: ["payments.transfer"]
+      tools: ["payments_transfer"]
       when: "#args['amount'] > 1000"
       decision: require-approval
       reason: "Transfers above $1,000 need a second person"
     - id: everyday-banking
-      tools: ["accounts.balance", "payments.transfer"]
+      tools: ["accounts_balance", "payments_transfer"]
       decision: allow

@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
  * Declares that every call to this {@code @Tool} method needs a human's approval.
  *
  * <pre>{@code
- * @Tool(name = "payments.transfer", description = "Transfer money between accounts")
+ * @Tool(name = "payments_transfer", description = "Transfer money between accounts")
  * @RequiresApproval(reason = "Moves real money")
  * public TransferResult transfer(String from, String to, BigDecimal amount) { ... }
  * }</pre>
