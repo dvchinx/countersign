@@ -173,6 +173,7 @@ All properties live under `countersign.*`. Only `policies` is needed to get star
 | `countersign.receipts.stream-id` | app name + random | Receipt chain id for this instance. |
 | `countersign.audit.strict` | `false` | Refuse the call when its receipt cannot be stored. |
 | `countersign.audit.in-memory-capacity` | `10000` | Receipts kept by the default in-memory sink. |
+| `countersign.audit.jdbc.initialize-schema` | `true` | With `countersign-audit-jdbc`: create the receipts table at startup if it is missing. |
 | `countersign.approval.timeout` | `2m` | How long a call waits for a human answer before it is denied. |
 | `countersign.annotation-packages` | | Extra packages scanned for `@RequiresApproval`; your application's packages are always scanned. |
 
@@ -194,8 +195,28 @@ countersign:
     args-hmac-key: ${COUNTERSIGN_ARGS_HMAC_KEY}
 ```
 
-Receipts are kept in memory by default (also announced at startup). Define your own `AuditSink` bean to store them;
-any Countersign bean can be replaced the same way, and `Policy` beans are added to the configured policies.
+**Storing receipts.** Receipts are kept in memory by default, and startup warns about it. To keep them in
+PostgreSQL (14 or later), add the JDBC module next to the starter. With a `DataSource` in the application, it is
+used automatically, and the `countersign_receipt` table is created at startup if it is missing:
+
+```xml
+<dependency>
+    <groupId>io.github.dvchinx</groupId>
+    <artifactId>countersign-audit-jdbc</artifactId>
+</dependency>
+```
+
+The table only accepts inserts: triggers reject `UPDATE`, `DELETE` and `TRUNCATE`. If you manage the schema with
+Flyway or Liquibase, copy `schema-postgresql.sql` from the jar and set
+`countersign.audit.jdbc.initialize-schema=false`. To check a stream later:
+
+```java
+ReceiptVerifier verifier = ReceiptVerifier.fromX509Base64(publicKey);
+verifier.verify(jdbcAuditSink.stream(streamId));   // Valid, or the first receipt that was changed
+```
+
+To send receipts somewhere else, define your own `AuditSink` bean. Any Countersign bean can be replaced the same
+way, and `Policy` beans are added to the configured policies.
 
 **`@RequiresApproval` in code.** The rule lives next to the tool it protects, so no configuration change can drop it.
 A configured `allow` cannot skip the approval, a configured `deny` still wins, and with no configured policy for the
@@ -257,7 +278,7 @@ wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Build
 - [x] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with a deny-on-timeout gateway
 - [x] `@RequiresApproval`
 - [x] Spring Boot starter and startup banner line
-- [ ] In-memory and PostgreSQL audit sinks
+- [x] In-memory and PostgreSQL audit sinks
 - [ ] Micrometer metrics and observations
 - [ ] `banking-agent` example and demo GIF
 - [ ] Published to Maven Central

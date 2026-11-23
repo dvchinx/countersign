@@ -176,6 +176,7 @@ Todas las propiedades viven bajo `countersign.*`. Para empezar solo necesitas `p
 | `countersign.receipts.stream-id` | nombre de la app + aleatorio | Id de la cadena de recibos de esta instancia. |
 | `countersign.audit.strict` | `false` | Rechaza la llamada si su recibo no se puede guardar. |
 | `countersign.audit.in-memory-capacity` | `10000` | Recibos que guarda el sink en memoria por defecto. |
+| `countersign.audit.jdbc.initialize-schema` | `true` | Con `countersign-audit-jdbc`: crea la tabla de recibos al arrancar si no existe. |
 | `countersign.approval.timeout` | `2m` | Cuánto espera una llamada la respuesta de una persona antes de denegarse. |
 | `countersign.annotation-packages` | | Paquetes extra donde buscar `@RequiresApproval`; los paquetes de tu aplicación se escanean siempre. |
 
@@ -197,9 +198,28 @@ countersign:
     args-hmac-key: ${COUNTERSIGN_ARGS_HMAC_KEY}
 ```
 
-Por defecto los recibos se guardan en memoria (también se avisa al arrancar). Define tu propio bean `AuditSink` para
-guardarlos; cualquier bean de Countersign se reemplaza igual, y los beans `Policy` se suman a las políticas
-configuradas.
+**Guardar los recibos.** Por defecto los recibos se guardan en memoria, y se avisa al arrancar. Para guardarlos en
+PostgreSQL (14 o posterior), añade el módulo JDBC junto al starter. Si la aplicación tiene un `DataSource`, se usa
+automáticamente, y la tabla `countersign_receipt` se crea al arrancar si no existe:
+
+```xml
+<dependency>
+    <groupId>io.github.dvchinx</groupId>
+    <artifactId>countersign-audit-jdbc</artifactId>
+</dependency>
+```
+
+La tabla solo acepta inserciones: unos triggers rechazan `UPDATE`, `DELETE` y `TRUNCATE`. Si gestionas el esquema
+con Flyway o Liquibase, copia `schema-postgresql.sql` del jar y pon `countersign.audit.jdbc.initialize-schema=false`.
+Para comprobar un stream más tarde:
+
+```java
+ReceiptVerifier verifier = ReceiptVerifier.fromX509Base64(publicKey);
+verifier.verify(jdbcAuditSink.stream(streamId));   // Valid, o el primer recibo que se modificó
+```
+
+Para enviar los recibos a otro sitio, define tu propio bean `AuditSink`. Cualquier bean de Countersign se reemplaza
+igual, y los beans `Policy` se suman a las políticas configuradas.
 
 **`@RequiresApproval` en el código.** La regla vive junto a la herramienta que protege, así que ningún cambio de
 configuración puede quitarla. Un `allow` configurado no puede saltarse la aprobación, un `deny` configurado sigue
@@ -264,7 +284,7 @@ tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envu�
 - [x] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` con un gateway que deniega al vencer el tiempo
 - [x] `@RequiresApproval`
 - [x] Starter de Spring Boot y línea de arranque en el log
-- [ ] Destinos de auditoría en memoria y PostgreSQL
+- [x] Destinos de auditoría en memoria y PostgreSQL
 - [ ] Métricas y observaciones de Micrometer
 - [ ] Ejemplo `banking-agent` y GIF de demo
 - [ ] Publicado en Maven Central

@@ -263,7 +263,7 @@ Done means: published to Maven Central as `0.1.0` with the banking demo and a re
 - [x] Decisions: ALLOW, DENY, REQUIRE_APPROVAL (with default deny-on-timeout gateway)
 - [x] `@RequiresApproval` annotation
 - [x] Starter: auto-config, `countersign.*` properties, startup banner line
-- [ ] `AuditSink`: in-memory + JDBC/PostgreSQL
+- [x] `AuditSink`: in-memory + JDBC/PostgreSQL
 - [ ] Micrometer metrics and observations
 - [ ] Example `banking-agent` (blocks a large transfer, asks approval, shows receipt)
 - [ ] README with quickstart, GIF, comparison table

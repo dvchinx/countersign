@@ -9,6 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `countersign-audit-jdbc` ([ADR 0010](docs/adr/0010-jdbc-audit-sink.md)): `JdbcAuditSink` stores receipts in an
+  append-only PostgreSQL 14+ table, `countersign_receipt` (triggers reject `UPDATE`, `DELETE` and `TRUNCATE`), and
+  reads a stream back in sequence order for `ReceiptVerifier`. The starter uses it when the module is on the
+  classpath and there is one `DataSource`, creating the table at startup unless
+  `countersign.audit.jdbc.initialize-schema=false`.
+- `AuditSinkContract` and `TestReceipts` in `countersign-test`: the contract every `AuditSink` extends, and real
+  signed receipts for tests.
+- `InMemoryAuditSink.stream(streamId)`: one stream in sequence order, ready to verify.
 - `countersign-core` domain model: `ToolInvocation`, the sealed `Decision` (`ALLOW`, `DENY`, `REQUIRE_APPROVAL`),
   `EvaluationResult` and an immutable JSON tree for tool arguments
   ([ADR 0002](docs/adr/0002-tool-arguments-as-core-json-tree.md)).
@@ -52,3 +60,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - ArchUnit rule that keeps `countersign-core` free of Spring and other frameworks.
 - Maven Wrapper, Spotless (Palantir Java Format), JaCoCo `coverage` profile and GitHub Actions CI.
 - Apache 2.0 license, README in English and Spanish.
+
+### Fixed
+
+- Concurrent tool calls could hand a stream's receipts to the `AuditSink` out of sequence order, while the sink
+  contract and `InMemoryAuditSink.receipts()` promised chain order. Sinks now return streams in sequence order when
+  read back.
