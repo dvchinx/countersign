@@ -35,12 +35,14 @@ herramientas.
 
 ## Demo
 
-> El GIF grabado llega con la `0.1.0`. Esto es lo que muestra el ejemplo [`banking-agent`](examples/banking-agent):
+El ejemplo [`banking-agent`](examples/banking-agent), grabado mientras se ejecuta:
 
 <p align="center">
-  <img src="docs/images/banking-demo.drawio.svg" width="860"
-       alt="Demo del agente bancario: una transferencia de 5.000 dólares necesita aprobación humana y luego se ejecuta; una petición DROP TABLE es denegada por una política. Cada paso genera un recibo firmado.">
+  <img src="docs/images/banking-demo.gif" width="860"
+       alt="Grabación de terminal de la demo del agente bancario. Alice pide al agente mover 5.000 dólares a ACME Corp; Countersign retiene la llamada payments_transfer hasta que la apruebe una segunda persona. Alice no puede aprobar su propia petición; ops@bank.example la aprueba y la transferencia se ejecuta. Después Alice pide borrar la tabla de transacciones; Countersign lo deniega por la política no-destructive-sql. Cada llamada deja un recibo firmado, y los dos recibos se listan, encadenados, y se verifican.">
 </p>
+
+[Diagrama estático del mismo flujo](docs/images/banking-demo.drawio.svg).
 
 El modelo nunca ve un stack trace. Recibe un rechazo estructurado que puede explicarle al usuario,
 y tú obtienes un recibo que puedes verificar después.
@@ -309,7 +311,7 @@ tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envu�
 - [x] Destinos de auditoría en memoria y PostgreSQL
 - [x] Métricas y observaciones de Micrometer
 - [x] Ejemplo `banking-agent`
-- [ ] GIF de demo
+- [x] GIF de demo
 - [ ] Publicado en Maven Central
 
 No está previsto para la `0.1.0`: clasificadores basados en LLM, un panel web, frameworks que no sean Spring, A2A ni un servidor remoto de políticas.

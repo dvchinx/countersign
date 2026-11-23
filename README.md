@@ -33,12 +33,14 @@ Think of it as **Spring Security for agent tool calls**. It works with Spring AI
 
 ## Demo
 
-> The recorded GIF ships with `0.1.0`. This is what the [`banking-agent`](examples/banking-agent) example shows:
+The [`banking-agent`](examples/banking-agent) example, recorded as it runs:
 
 <p align="center">
-  <img src="docs/images/banking-demo.drawio.svg" width="860"
-       alt="Banking agent demo: a $5,000 transfer needs human approval and then runs; a DROP TABLE request is denied by policy. Each step produces a signed receipt.">
+  <img src="docs/images/banking-demo.gif" width="860"
+       alt="Terminal recording of the banking agent demo. Alice asks the agent to move $5,000 to ACME Corp; Countersign holds the payments_transfer call for a second person. Alice cannot approve her own request; ops@bank.example approves it and the transfer runs. Alice then asks the agent to drop the transactions table; Countersign denies it under the no-destructive-sql policy. Each call leaves a signed receipt, and the two receipts are listed, chained, and verified.">
 </p>
+
+[Still diagram of the same flow](docs/images/banking-demo.drawio.svg).
 
 The model never sees a stack trace. It gets a structured refusal it can explain to the user, and
 you get a receipt you can verify later.
@@ -302,7 +304,7 @@ wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Build
 - [x] In-memory and PostgreSQL audit sinks
 - [x] Micrometer metrics and observations
 - [x] `banking-agent` example
-- [ ] Demo GIF
+- [x] Demo GIF
 - [ ] Published to Maven Central
 
 Not planned for `0.1.0`: LLM-based classifiers, a UI dashboard, non-Spring frameworks, A2A, or a remote policy server.

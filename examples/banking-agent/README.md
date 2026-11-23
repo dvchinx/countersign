@@ -89,6 +89,16 @@ policy required it, and holds a keyed hash of the arguments, never the values.
 **Metrics.** `curl -s localhost:8080/actuator/metrics/countersign.decisions` shows the count; add
 `?tag=outcome:refuse` to see only refused calls.
 
+## Record the demo GIF
+
+[`demo/demo.sh`](demo/demo.sh) wraps the calls above in short commands (`ask`, `approve`, `receipts`, `verify`), and
+[`demo/banking-demo.tape`](demo/banking-demo.tape) is the [VHS](https://github.com/charmbracelet/vhs) script that
+records `docs/images/banking-demo.gif` with them. After changing the demo, re-record it from the repository root:
+
+```bash
+vhs examples/banking-agent/demo/banking-demo.tape
+```
+
 ## Use a real model
 
 Replace the `demoChatModel` bean in
