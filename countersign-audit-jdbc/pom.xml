@@ -12,7 +12,7 @@
 
     <artifactId>countersign-audit-jdbc</artifactId>
     <name>Countersign Audit JDBC</name>
-    <description>Append-only AuditSink for PostgreSQL.</description>
+    <description>Append-only AuditSink for PostgreSQL 14+.</description>
 
     <dependencies>
         <dependency>
@@ -24,6 +24,27 @@
             <artifactId>spring-jdbc</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.github.dvchinx</groupId>
+            <artifactId>countersign-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Users bring their own driver, usually through spring-boot-starter-jdbc. -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
