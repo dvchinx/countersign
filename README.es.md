@@ -129,7 +129,8 @@ filtro de contenido, no en lugar de uno.
   `java.security`, más una utilidad de verificación que detecta cualquier recibo editado o borrado.
 - **Privacidad por defecto:** los recibos guardan un hash con clave (HMAC) de los argumentos, así que los valores no se pueden recuperar probando candidatos. Guardar los valores en crudo es opcional y pasa por un `Redactor`.
 - **Destinos de auditoría:** en memoria y PostgreSQL (solo inserción) incluidos.
-- **Observabilidad:** `countersign.decisions`, `countersign.evaluation` y `countersign.audit.failures` vía Micrometer.
+- **Observabilidad:** `countersign.decisions`, `countersign.evaluation` y `countersign.audit.failures` vía Micrometer,
+  y la decisión y el id del recibo en el span de cada llamada a herramienta.
 - **Utilidades de test:** `countersign-test` te permite comprobar en tus propios tests que tu agente fue bloqueado.
 
 ### Un recibo
@@ -221,6 +222,18 @@ verifier.verify(jdbcAuditSink.stream(streamId));   // Valid, o el primer recibo 
 Para enviar los recibos a otro sitio, define tu propio bean `AuditSink`. Cualquier bean de Countersign se reemplaza
 igual, y los beans `Policy` se suman a las políticas configuradas.
 
+**Métricas y trazas.** Con Spring Boot Actuator, Countersign publica en Micrometer sin configurar nada:
+
+| Métrica | Tags | Para qué |
+|---|---|---|
+| `countersign.decisions` | `tool`, `decision`, `policy`, `basis`, `outcome`, `approval` | Alertar con `outcome=refuse`; ver aprobaciones que vencen. |
+| `countersign.evaluation` | `tool` | Vigilar el tiempo de evaluación de políticas (no incluye la espera de una persona). |
+| `countersign.audit.failures` | `tool`, `stage` | Detectar recibos que no se firmaron (`receipt`) o no se guardaron (`sink`). |
+
+Las trazas muestran `countersign.decision`, `countersign.outcome`, `countersign.policy` y `countersign.receipt` en el
+span `spring.ai.tool` de Spring AI. Para reaccionar tú a las decisiones, define un bean `DecisionListener`: recibe
+cada decisión, sin los argumentos.
+
 **`@RequiresApproval` en el código.** La regla vive junto a la herramienta que protege, así que ningún cambio de
 configuración puede quitarla. Un `allow` configurado no puede saltarse la aprobación, un `deny` configurado sigue
 ganando, y si no hay ninguna política configurada para la herramienta, se puede usar con aprobación incluso con el
@@ -285,7 +298,7 @@ tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envu�
 - [x] `@RequiresApproval`
 - [x] Starter de Spring Boot y línea de arranque en el log
 - [x] Destinos de auditoría en memoria y PostgreSQL
-- [ ] Métricas y observaciones de Micrometer
+- [x] Métricas y observaciones de Micrometer
 - [ ] Ejemplo `banking-agent` y GIF de demo
 - [ ] Publicado en Maven Central
 

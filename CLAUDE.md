@@ -62,7 +62,7 @@ countersign/
 │       ├── model/                  # ToolInvocation, Decision, PolicyMatch, Receipt...
 │       ├── policy/                 # Policy, PolicyEngine, condition evaluation
 │       ├── receipt/                # Receipt building, hash chaining, signing
-│       └── spi/                    # Ports: AuditSink, ApprovalGateway, Redactor, ReceiptSigner
+│       └── spi/                    # Ports: AuditSink, ApprovalGateway, Redactor, ReceiptSigner, DecisionListener
 ├── countersign-spring-ai/             # Adapters: wraps ToolCallback / ToolCallbackProvider
 ├── countersign-spring-boot-starter/   # Auto-configuration + @ConfigurationProperties
 ├── countersign-audit-jdbc/            # AuditSink implementation (PostgreSQL, append-only)
@@ -192,8 +192,9 @@ Integration tests that need PostgreSQL use Testcontainers; Docker must be runnin
 - Exceptions: domain errors are `CountersignException` subclasses; never let a raw
   `RuntimeException` from a policy reach the model as a stack trace.
 - Logging: SLF4J, structured where possible, never include argument values or secrets.
-- Metrics: `countersign.decisions` (tags: `tool`, `decision`, `policy`), `countersign.evaluation`
-  (timer), `countersign.audit.failures` (counter).
+- Metrics: `countersign.decisions` (tags: `tool`, `decision`, `policy`, `basis`, `outcome`, `approval`),
+  `countersign.evaluation` (timer, tag `tool`), `countersign.audit.failures` (counter, tags `tool`, `stage`).
+  They are published by a `DecisionListener` (ADR 0011); tag values must stay bounded.
 
 ## Testing rules
 
@@ -264,7 +265,7 @@ Done means: published to Maven Central as `0.1.0` with the banking demo and a re
 - [x] `@RequiresApproval` annotation
 - [x] Starter: auto-config, `countersign.*` properties, startup banner line
 - [x] `AuditSink`: in-memory + JDBC/PostgreSQL
-- [ ] Micrometer metrics and observations
+- [x] Micrometer metrics and observations
 - [ ] Example `banking-agent` (blocks a large transfer, asks approval, shows receipt)
 - [ ] README with quickstart, GIF, comparison table
 

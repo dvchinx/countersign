@@ -126,7 +126,8 @@ content filter, not instead of one.
   `java.security`, plus a verification utility that detects any edited or deleted receipt.
 - **Privacy by default:** receipts store a keyed hash (HMAC) of the arguments, so values cannot be recovered by guessing. Storing raw values is opt-in and goes through a `Redactor`.
 - **Audit sinks:** in-memory and PostgreSQL (append-only) out of the box.
-- **Observability:** `countersign.decisions`, `countersign.evaluation` and `countersign.audit.failures` via Micrometer.
+- **Observability:** `countersign.decisions`, `countersign.evaluation` and `countersign.audit.failures` via Micrometer,
+  and the decision and receipt id on each tool call's trace span.
 - **Test helpers:** `countersign-test` lets you assert in your own tests that your agent was blocked.
 
 ### A receipt
@@ -218,6 +219,18 @@ verifier.verify(jdbcAuditSink.stream(streamId));   // Valid, or the first receip
 To send receipts somewhere else, define your own `AuditSink` bean. Any Countersign bean can be replaced the same
 way, and `Policy` beans are added to the configured policies.
 
+**Metrics and tracing.** With Spring Boot Actuator, Countersign publishes to Micrometer with no configuration:
+
+| Meter | Tags | Use it to |
+|---|---|---|
+| `countersign.decisions` | `tool`, `decision`, `policy`, `basis`, `outcome`, `approval` | Alert on `outcome=refuse`; see approvals that time out. |
+| `countersign.evaluation` | `tool` | Watch policy evaluation time (waiting for a human is not included). |
+| `countersign.audit.failures` | `tool`, `stage` | Catch receipts that were not signed (`receipt`) or not stored (`sink`). |
+
+Traces show `countersign.decision`, `countersign.outcome`, `countersign.policy` and `countersign.receipt` on Spring
+AI's `spring.ai.tool` span. To react to decisions yourself, define a `DecisionListener` bean: it gets every decision,
+without the arguments.
+
 **`@RequiresApproval` in code.** The rule lives next to the tool it protects, so no configuration change can drop it.
 A configured `allow` cannot skip the approval, a configured `deny` still wins, and with no configured policy for the
 tool it is usable with approval even under the default `deny`. Countersign finds the annotation at startup by
@@ -279,7 +292,7 @@ wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Build
 - [x] `@RequiresApproval`
 - [x] Spring Boot starter and startup banner line
 - [x] In-memory and PostgreSQL audit sinks
-- [ ] Micrometer metrics and observations
+- [x] Micrometer metrics and observations
 - [ ] `banking-agent` example and demo GIF
 - [ ] Published to Maven Central
 

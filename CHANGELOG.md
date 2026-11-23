@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Metrics and tracing ([ADR 0011](docs/adr/0011-decision-listeners-and-micrometer.md)): the `DecisionListener` port
+  and `DecisionEvent` in the core report every decision without its arguments; `MicrometerDecisionListener` publishes
+  `countersign.decisions`, `countersign.evaluation` and `countersign.audit.failures`; `ObservationDecisionListener`
+  adds the decision and receipt id to Spring AI's `spring.ai.tool` span. The starter registers them when a
+  `MeterRegistry` or `ObservationRegistry` exists, and hands every `DecisionListener` bean to the guard.
 - `countersign-audit-jdbc` ([ADR 0010](docs/adr/0010-jdbc-audit-sink.md)): `JdbcAuditSink` stores receipts in an
   append-only PostgreSQL 14+ table, `countersign_receipt` (triggers reject `UPDATE`, `DELETE` and `TRUNCATE`), and
   reads a stream back in sequence order for `ReceiptVerifier`. The starter uses it when the module is on the
