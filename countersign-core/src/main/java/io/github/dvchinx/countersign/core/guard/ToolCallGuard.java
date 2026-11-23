@@ -4,6 +4,7 @@ import io.github.dvchinx.countersign.core.model.ApprovalDecision;
 import io.github.dvchinx.countersign.core.model.ApprovalOutcome;
 import io.github.dvchinx.countersign.core.model.ApprovalRequest;
 import io.github.dvchinx.countersign.core.model.Decision;
+import io.github.dvchinx.countersign.core.model.DecisionEvent;
 import io.github.dvchinx.countersign.core.model.EvaluationResult;
 import io.github.dvchinx.countersign.core.model.JsonObject;
 import io.github.dvchinx.countersign.core.model.Receipt;
@@ -12,9 +13,12 @@ import io.github.dvchinx.countersign.core.policy.PolicyEngine;
 import io.github.dvchinx.countersign.core.receipt.ReceiptChain;
 import io.github.dvchinx.countersign.core.spi.ApprovalGateway;
 import io.github.dvchinx.countersign.core.spi.AuditSink;
+import io.github.dvchinx.countersign.core.spi.DecisionListener;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -40,6 +44,9 @@ import org.jspecify.annotations.Nullable;
  *   <li>an audit sink that throws: logged as an error, and refused when strict auditing is on.
  * </ul>
  *
+ * <p>Once a call is decided, every {@link DecisionListener} hears about it, before the tool runs. A listener that
+ * throws is logged and ignored; it never changes the verdict.
+ *
  * <p>Waiting for approval blocks the calling thread until the answer or the timeout, whichever comes first. Use
  * virtual threads, or keep the timeout short, if many calls may wait at once. Thread-safe; never throws for a failure
  * on the decision path.
@@ -61,6 +68,7 @@ public final class ToolCallGuard {
     private final Duration approvalTimeout;
     private final boolean strictAudit;
     private final Clock clock;
+    private final List<DecisionListener> listeners;
 
     private ToolCallGuard(Builder builder) {
         this.engine = builder.engine;
@@ -70,6 +78,7 @@ public final class ToolCallGuard {
         this.approvalTimeout = builder.approvalTimeout;
         this.strictAudit = builder.strictAudit;
         this.clock = builder.clock;
+        this.listeners = List.copyOf(builder.listeners);
     }
 
     /**
@@ -93,11 +102,17 @@ public final class ToolCallGuard {
      */
     public Verdict check(ToolInvocation invocation) {
         Objects.requireNonNull(invocation, "invocation");
+        long start = System.nanoTime();
         EvaluationResult result = engine.evaluate(invocation);
+        Duration evaluationTime = Duration.ofNanos(System.nanoTime() - start);
         if (result.decision() instanceof Decision.RequireApproval approval) {
-            return decide(invocation, result, askForApproval(invocation, result.policyId(), approval.reason()));
+            return decide(
+                    invocation,
+                    result,
+                    askForApproval(invocation, result.policyId(), approval.reason()),
+                    evaluationTime);
         }
-        return decide(invocation, result, null);
+        return decide(invocation, result, null, evaluationTime);
     }
 
     /**
@@ -121,7 +136,7 @@ public final class ToolCallGuard {
             Instant timestamp) {
         ToolInvocation invocation =
                 new ToolInvocation(invocationId, toolName, JsonObject.empty(), principal, conversationId, timestamp);
-        return decide(invocation, EvaluationResult.invalidArguments(), null);
+        return decide(invocation, EvaluationResult.invalidArguments(), null, Duration.ZERO);
     }
 
     /** The answer to an approval request, as Countersign records and reports it. */
@@ -187,7 +202,8 @@ public final class ToolCallGuard {
                 "This call needs human approval (" + reason + ") and the approver could not be reached");
     }
 
-    private Verdict decide(ToolInvocation invocation, EvaluationResult result, @Nullable Approval approval) {
+    private Verdict decide(
+            ToolInvocation invocation, EvaluationResult result, @Nullable Approval approval, Duration evaluationTime) {
         Receipt receipt;
         try {
             receipt = approval == null
@@ -200,9 +216,16 @@ public final class ToolCallGuard {
                     invocation.toolName(),
                     e.getClass().getName());
             LOG.log(System.Logger.Level.DEBUG, "Receipt failure details", e);
-            return new Verdict.Refuse(result.decision().type(), RECEIPT_FAILED, null);
+            return publish(
+                    invocation,
+                    result,
+                    approval,
+                    evaluationTime,
+                    false,
+                    new Verdict.Refuse(result.decision().type(), RECEIPT_FAILED, null));
         }
 
+        boolean auditFailed = false;
         try {
             auditSink.append(receipt);
         } catch (RuntimeException e) {
@@ -215,12 +238,19 @@ public final class ToolCallGuard {
                     e.getClass().getName(),
                     strictAudit ? "; refusing the call (strict audit)" : "");
             LOG.log(System.Logger.Level.DEBUG, "Audit failure details", e);
+            auditFailed = true;
             if (strictAudit) {
-                return new Verdict.Refuse(result.decision().type(), AUDIT_FAILED, receipt);
+                return publish(
+                        invocation,
+                        result,
+                        approval,
+                        evaluationTime,
+                        true,
+                        new Verdict.Refuse(result.decision().type(), AUDIT_FAILED, receipt));
             }
         }
 
-        return switch (result.decision()) {
+        Verdict verdict = switch (result.decision()) {
             case Decision.Allow allow -> new Verdict.Proceed(receipt);
             case Decision.Deny deny -> new Verdict.Refuse(Decision.Type.DENY, deny.reason(), receipt);
             case Decision.RequireApproval required ->
@@ -228,6 +258,47 @@ public final class ToolCallGuard {
                         ? new Verdict.Proceed(receipt)
                         : new Verdict.Refuse(Decision.Type.REQUIRE_APPROVAL, approval.message(), receipt);
         };
+        return publish(invocation, result, approval, evaluationTime, auditFailed, verdict);
+    }
+
+    /** Tells every listener what was decided, then returns the verdict unchanged. */
+    private Verdict publish(
+            ToolInvocation invocation,
+            EvaluationResult result,
+            @Nullable Approval approval,
+            Duration evaluationTime,
+            boolean auditFailed,
+            Verdict verdict) {
+        if (listeners.isEmpty()) {
+            return verdict;
+        }
+        DecisionEvent event = new DecisionEvent(
+                invocation.toolName(),
+                result.decision().type(),
+                result.basis(),
+                result.policyId(),
+                approval == null ? null : approval.outcome(),
+                verdict instanceof Verdict.Proceed,
+                evaluationTime,
+                switch (verdict) {
+                    case Verdict.Proceed proceed -> proceed.receipt();
+                    case Verdict.Refuse refuse -> refuse.receipt();
+                },
+                auditFailed);
+        for (DecisionListener listener : listeners) {
+            try {
+                listener.onDecision(event);
+            } catch (RuntimeException e) {
+                LOG.log(
+                        System.Logger.Level.ERROR,
+                        "Decision listener {0} failed for tool ''{1}'' ({2}); the decision stands",
+                        listener.getClass().getName(),
+                        invocation.toolName(),
+                        e.getClass().getName());
+                LOG.log(System.Logger.Level.DEBUG, "Decision listener failure details", e);
+            }
+        }
+        return verdict;
     }
 
     /** Builds a {@link ToolCallGuard}. Not thread-safe. */
@@ -240,6 +311,7 @@ public final class ToolCallGuard {
         private Duration approvalTimeout = DEFAULT_APPROVAL_TIMEOUT;
         private boolean strictAudit;
         private Clock clock = Clock.systemUTC();
+        private final List<DecisionListener> listeners = new ArrayList<>();
 
         private Builder(PolicyEngine engine, ReceiptChain receipts, AuditSink auditSink) {
             this.engine = Objects.requireNonNull(engine, "engine");
@@ -293,6 +365,18 @@ public final class ToolCallGuard {
          */
         public Builder clock(Clock clock) {
             this.clock = Objects.requireNonNull(clock, "clock");
+            return this;
+        }
+
+        /**
+         * Adds a listener that hears about every decision, for metrics or tracing. Listeners are called in the order
+         * they were added.
+         *
+         * @param listener the listener
+         * @return this builder
+         */
+        public Builder listener(DecisionListener listener) {
+            listeners.add(Objects.requireNonNull(listener, "listener"));
             return this;
         }
 
