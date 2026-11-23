@@ -9,6 +9,7 @@ import io.github.dvchinx.countersign.core.receipt.ArgumentsHmac;
 import io.github.dvchinx.countersign.core.receipt.ReceiptChain;
 import io.github.dvchinx.countersign.core.spi.ApprovalGateway;
 import io.github.dvchinx.countersign.core.spi.AuditSink;
+import io.github.dvchinx.countersign.core.spi.DecisionListener;
 import io.github.dvchinx.countersign.core.spi.ReceiptSigner;
 import io.github.dvchinx.countersign.springai.CountersignToolCallingBeanPostProcessor;
 import io.github.dvchinx.countersign.springai.annotation.RequiresApprovalPolicies;
@@ -40,7 +41,8 @@ import org.springframework.core.env.Environment;
  *
  * <p>Every bean backs off when the application defines its own of the same type, so any part can be replaced: a
  * persistent {@link AuditSink}, a KMS-backed {@link ReceiptSigner}, or a {@link PolicyEngine} built in code.
- * {@link Policy} beans are added to the configured policies.
+ * {@link Policy} beans are added to the configured policies, and every {@link DecisionListener} bean hears about each
+ * decision.
  *
  * <p>With {@code countersign.enabled=false} nothing is guarded, and a warning says so at startup.
  */
@@ -123,12 +125,14 @@ public class CountersignAutoConfiguration {
                 ReceiptChain receipts,
                 AuditSink auditSink,
                 ObjectProvider<ApprovalGateway> approvals,
+                ObjectProvider<DecisionListener> listeners,
                 CountersignProperties properties) {
-            return ToolCallGuard.builder(engine, receipts, auditSink)
+            ToolCallGuard.Builder guard = ToolCallGuard.builder(engine, receipts, auditSink)
                     .approvals(approvals.getIfUnique())
                     .approvalTimeout(properties.getApproval().getTimeout())
-                    .strictAudit(properties.getAudit().isStrict())
-                    .build();
+                    .strictAudit(properties.getAudit().isStrict());
+            listeners.orderedStream().forEach(guard::listener);
+            return guard.build();
         }
 
         @Bean
