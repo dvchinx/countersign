@@ -16,8 +16,12 @@ import org.junit.jupiter.api.Test;
 class InMemoryAuditSinkTest {
 
     private static Receipt receipt(long sequence) {
+        return receipt("s", sequence);
+    }
+
+    private static Receipt receipt(String streamId, long sequence) {
         return new Receipt(
-                "s",
+                streamId,
                 sequence,
                 "inv-" + sequence,
                 "tool",
@@ -44,6 +48,19 @@ class InMemoryAuditSinkTest {
 
         assertThat(sink.receipts()).extracting(Receipt::sequence).containsExactly(1L, 2L);
         assertThat(sink.capacity()).isEqualTo(InMemoryAuditSink.DEFAULT_CAPACITY);
+    }
+
+    @Test
+    void returnsOneStreamInSequenceOrderEvenWhenReceiptsArriveOutOfOrder() {
+        InMemoryAuditSink sink = new InMemoryAuditSink();
+        sink.append(receipt("a", 2));
+        sink.append(receipt("b", 1));
+        sink.append(receipt("a", 1));
+        sink.append(receipt("a", 3));
+
+        assertThat(sink.stream("a")).extracting(Receipt::sequence).containsExactly(1L, 2L, 3L);
+        assertThat(sink.stream("b")).extracting(Receipt::sequence).containsExactly(1L);
+        assertThat(sink.stream("unknown")).isEmpty();
     }
 
     @Test

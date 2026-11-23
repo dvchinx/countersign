@@ -3,6 +3,7 @@ package io.github.dvchinx.countersign.core.audit;
 import io.github.dvchinx.countersign.core.model.Receipt;
 import io.github.dvchinx.countersign.core.spi.AuditSink;
 import java.util.ArrayDeque;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
@@ -14,7 +15,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * the oldest receipt is dropped to make room. A stream with dropped receipts no longer verifies from its start, so
  * use a persistent sink in production.
  *
- * <p>Thread-safe. Receipts are kept in the order they were appended, which is the order of the hash chain.
+ * <p>Thread-safe. Receipts are kept in the order they arrived. Concurrent calls can deliver the receipts of one
+ * stream out of sequence order, so read a stream with {@link #stream(String)}, which sorts it, before verifying it.
  */
 public final class InMemoryAuditSink implements AuditSink {
 
@@ -59,7 +61,7 @@ public final class InMemoryAuditSink implements AuditSink {
     }
 
     /**
-     * Returns the receipts currently kept, oldest first.
+     * Returns the receipts currently kept, in the order they arrived.
      *
      * @return an immutable snapshot
      */
@@ -70,6 +72,20 @@ public final class InMemoryAuditSink implements AuditSink {
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * Returns the receipts kept for one stream, in sequence order, ready for {@code ReceiptVerifier}.
+     *
+     * @param streamId the stream
+     * @return an immutable snapshot; empty if no receipt of that stream is kept
+     */
+    public List<Receipt> stream(String streamId) {
+        Objects.requireNonNull(streamId, "streamId");
+        return receipts().stream()
+                .filter(receipt -> receipt.streamId().equals(streamId))
+                .sorted(Comparator.comparingLong(Receipt::sequence))
+                .toList();
     }
 
     /**
