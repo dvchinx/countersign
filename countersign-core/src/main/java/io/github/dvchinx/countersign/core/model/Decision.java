@@ -9,7 +9,8 @@ import java.util.Objects;
  * to update when a new kind of decision is added. Reasons are shown to the model as part of a refusal, so they must
  * explain the rule, never echo argument values.
  *
- * <p>{@code REDACT} is planned but not part of the {@code 0.1.0} scope yet.
+ * <p>Redaction is deliberately not a decision: it applies to every call that runs, whatever decided access, so that
+ * no approval or policy order can drop it (ADR 0015).
  */
 public sealed interface Decision permits Decision.Allow, Decision.Deny, Decision.RequireApproval {
 

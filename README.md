@@ -126,7 +126,8 @@ content filter, not instead of one.
 
 ## Features
 
-- **Three decisions:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`. `REDACT` is planned.
+- **Three decisions:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`. Redaction of arguments and results is planned
+  ([ADR 0015](docs/adr/0015-redaction.md)).
 - **Declarative policies:** tool globs (`db_*`), priorities, and conditions written in a sandboxed SpEL
   (`SimpleEvaluationContext`: no type references, no bean access, no arbitrary method calls).
 - **Annotations:** `@RequiresApproval` on your `@Tool` methods. `@ToolPolicy(id = "...")` is planned.

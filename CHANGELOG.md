@@ -26,6 +26,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Redaction is planned as an obligation on calls that run, not as a fourth decision
+  ([ADR 0015](docs/adr/0015-redaction.md)), so that no approval or policy order can drop it. CLAUDE.md and the
+  READMEs no longer describe `REDACT` as a decision.
 - Starter default: in applications with Spring Security, receipts now name the signed-in user and `#principal`
   policies match it, where before they saw no principal unless the tool context set one (ADR 0014).
 - CI runs the full test suite on Spring AI 2.0.2 and 2.1.0. A new, unpublished `compat/spring-ai-2.1` module tests
