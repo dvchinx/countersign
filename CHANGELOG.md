@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `CONTRIBUTING.md`, `SECURITY.md` (private vulnerability reporting through GitHub), issue templates and a pull
+  request template.
 - Releases to Maven Central ([ADR 0012](docs/adr/0012-releasing-to-maven-central.md)): a `release` profile that
   attaches sources and javadoc, signs with GPG and publishes through the Central Portal, and a GitHub Actions
   workflow that publishes when a `v*` tag matching the POM version is pushed. Examples are never published.
@@ -77,6 +79,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The READMEs no longer list `REDACT`, the `Redactor` or `@ToolPolicy` as available: they are planned, not
+  implemented.
 - The README, the banking-agent example and the Javadoc name tools `payments_transfer` and `db_*` instead of
   `payments.transfer` and `db.*`: OpenAI and Anthropic reject tool names with dots. Countersign still accepts any
   name.

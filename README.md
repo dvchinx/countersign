@@ -98,7 +98,7 @@ On startup you'll see one line telling you Countersign is active and which defau
 
 1. **Build** a `ToolInvocation`: tool name, parsed arguments, principal, conversation id.
 2. **Evaluate** it against your policies, in priority order. The first match wins; if nothing matches, the default (`deny`) applies.
-3. **Apply** the decision: run the tool, refuse it, ask a human, or redact it.
+3. **Apply** the decision: run the tool, refuse it, or ask a human first.
 4. **Record** a receipt: the decision, the matched policies, who approved it, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
 5. **Publish** it to your `AuditSink`, along with Micrometer metrics and observations.
 
@@ -123,14 +123,14 @@ content filter, not instead of one.
 
 ## Features
 
-- **Four decisions:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`, `REDACT`.
+- **Three decisions:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`. `REDACT` is planned.
 - **Declarative policies:** tool globs (`db_*`), priorities, and conditions written in a sandboxed SpEL
   (`SimpleEvaluationContext`: no type references, no bean access, no arbitrary method calls).
-- **Annotations:** `@RequiresApproval` and `@ToolPolicy(id = "...")` on your `@Tool` methods.
+- **Annotations:** `@RequiresApproval` on your `@Tool` methods. `@ToolPolicy(id = "...")` is planned.
 - **Human in the loop:** a pluggable `ApprovalGateway`. Countersign waits up to a timeout, denies if nobody answers, and records the approver in the receipt.
 - **Tamper-evident receipts:** canonical JSON, a SHA-256 hash chain and Ed25519 signatures using only
   `java.security`, plus a verification utility that detects any edited or deleted receipt.
-- **Privacy by default:** receipts store a keyed hash (HMAC) of the arguments, so values cannot be recovered by guessing. Storing raw values is opt-in and goes through a `Redactor`.
+- **Privacy by default:** receipts store a keyed hash (HMAC) of the arguments, so values cannot be recovered by guessing. Raw values are never stored.
 - **Audit sinks:** in-memory and PostgreSQL (append-only) out of the box.
 - **Observability:** `countersign.decisions`, `countersign.evaluation` and `countersign.audit.failures` via Micrometer,
   and the decision and receipt id on each tool call's trace span.
@@ -316,12 +316,12 @@ touching the policy engine:
 
 - **`ApprovalGateway`:** Slack, Teams, email or a web console approver
 - **`AuditSink`:** Kafka, S3, OpenSearch, or your SIEM
-- **`Redactor`:** PII masking strategies
 - **`ReceiptSigner`:** KMS / HSM-backed signing
 
-Each SPI comes with an abstract contract test in `countersign-test`. Passing it is the bar for merging.
-Architecture, conventions and testing rules are in [`CLAUDE.md`](CLAUDE.md). Issues labelled
-`good first issue` are the best place to start.
+Passing the port's contract test in `countersign-test` is the bar for merging (`AuditSinkContract` today;
+contracts for the other ports are good first contributions). Start with [`CONTRIBUTING.md`](CONTRIBUTING.md);
+issues labelled `good first issue` are the best place to begin. To report a vulnerability, see
+[`SECURITY.md`](SECURITY.md).
 
 If Countersign looks useful to you, a ⭐ helps other Spring teams find it.
 

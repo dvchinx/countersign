@@ -1,0 +1,46 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **If a tool call runs when it should be refused, or receipts can be tampered with, do not file it here.**
+        Report it privately: see [SECURITY.md](https://github.com/dvchinx/countersign/blob/main/SECURITY.md).
+
+        Please never paste real tool arguments, prompts, API keys or signing keys.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The smallest configuration (`countersign.*` properties and policies) and tool that shows the problem. A failing test is ideal.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or stack trace
+      description: Include the Countersign startup line if you can.
+      render: text
+  - type: input
+    id: countersign-version
+    attributes:
+      label: Countersign version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Spring AI, Spring Boot and Java versions
+      placeholder: Spring AI 2.0.2, Spring Boot 4.1.2, Java 21
+    validations:
+      required: true

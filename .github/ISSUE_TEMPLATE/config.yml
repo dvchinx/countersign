@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/dvchinx/countersign/security/advisories/new
+    about: A tool call that should be refused runs, a receipt can be forged, and similar. Please report it privately.
