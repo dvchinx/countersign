@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The READMEs list the steps of a tool call in the order they happen: the receipt is recorded before the tool runs.
 - The release build waits until the Central Portal validates the bundle instead of until it is published, so slow
   publishing no longer fails the release workflow after a successful upload.
 

@@ -100,9 +100,11 @@ Al arrancar verás una línea en el log que indica que Countersign está activo 
 </p>
 
 1. **Construye** un `ToolInvocation`: nombre de la herramienta, argumentos parseados, principal e id de conversación.
-2. **Evalúa** la invocación contra tus políticas, en orden de prioridad. Gana la primera que coincide; si ninguna coincide, se aplica la decisión por defecto (`deny`).
-3. **Aplica** la decisión: ejecuta la herramienta, la rechaza o primero le pregunta a un humano.
-4. **Registra** un recibo: la decisión, las políticas que coincidieron, quién la aprobó, un hash con clave (HMAC-SHA256) de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
+2. **Evalúa** la invocación contra tus políticas, en orden de prioridad. Gana la primera que coincide; si ninguna coincide, se aplica la decisión por defecto (`deny`). Con `REQUIRE_APPROVAL`, espera a un humano hasta que venza el plazo.
+3. **Registra** un recibo: la decisión, las políticas que coincidieron, quién la aprobó, un hash con clave (HMAC-SHA256) de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
+4. **Aplica** la decisión: ejecuta la herramienta si se permitió o se aprobó; si no, devuelve un rechazo estructurado.
+
+El recibo se firma antes de que la herramienta se ejecute: si la firma falla, la herramienta no corre.
 5. **Publica** el recibo en tu `AuditSink`, junto con métricas y observaciones de Micrometer.
 
 El control ocurre **donde se ejecuta la herramienta**, no en la lista de herramientas que se le envía
