@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- The signed-in Spring Security user is now the principal of each tool call, in policies (`#principal`) and receipts,
+  with no code ([ADR 0014](docs/adr/0014-principal-from-spring-security.md)). A new port, `PrincipalResolver`, tells
+  `ToolCallGuard` who a call acts for when the adapter does not know; `SpringSecurityPrincipalResolver` implements it
+  and the starter registers it when Spring Security is on the classpath. A principal in the tool context still wins.
+  A resolver that throws refuses the call (fail closed), and the first call recorded without a principal logs a
+  warning. The startup line says where the principal comes from.
+
 ### Fixed
 
 - On Spring AI 2.1, a reply paused for tool call confirmation can be resumed while Countersign is active
@@ -17,6 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Starter default: in applications with Spring Security, receipts now name the signed-in user and `#principal`
+  policies match it, where before they saw no principal unless the tool context set one (ADR 0014).
 - CI runs the full test suite on Spring AI 2.0.2 and 2.1.0. A new, unpublished `compat/spring-ai-2.1` module tests
   tool call confirmation on Spring AI 2.1 in every build.
 - `GuardedToolCallingManager` is no longer `final` (its methods are), so that its Spring AI 2.1 variant can extend it.
