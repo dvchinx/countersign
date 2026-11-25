@@ -7,8 +7,8 @@ Guidance for Claude Code (and human contributors) working in this repository.
 **Countersign** is a runtime guardrails layer for AI agents built with **Spring AI**.
 Think of it as *"Spring Security for agent tool calls"*: every tool an agent invokes (Spring AI
 `@Tool` methods, `ToolCallback`s, and MCP tools) passes through a policy engine that can
-**allow**, **deny**, **require human approval**, or **redact** the call, and every decision
-produces a tamper-evident **receipt** that can be audited and replayed.
+**allow**, **deny**, or **require human approval** for the call, and can **redact** the arguments
+or result of calls that run; every decision produces a tamper-evident **receipt** that can be audited and replayed.
 
 Target user: a Spring Boot team that wants to put an agent in production without writing a
 Python sidecar, and that has to answer "what did the agent do, and who allowed it?"
@@ -96,20 +96,26 @@ Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)               
                                ├─ 2. PolicyEngine.evaluate(invocation) ──► EvaluationResult
                                ├─ 3. REQUIRE_APPROVAL only: ApprovalGateway, wait up to the timeout;
                                │     rejected / timed out / no gateway / error → refuse (ADR 0008)
-                               ├─ 4. ReceiptChain.append ──► signed Receipt, with approval outcome and
-                               │     approver (before the tool runs)
-                               ├─ 5. AuditSink.append(receipt) + Micrometer observation
-                               └─ 6. Apply decision:
-                                      ALLOW / approved → delegate to the real ToolCallback
+                               ├─ 4. Calls that will run: every matching redaction rule applies; ARGS
+                               │     redactors run now; failure → refuse and record (ADR 0015)
+                               ├─ 5. ReceiptChain.append ──► signed Receipt, with approval outcome,
+                               │     approver and applied redactions (before the tool runs)
+                               ├─ 6. AuditSink.append(receipt) + Micrometer observation
+                               └─ 7. Apply decision:
+                                      ALLOW / approved → delegate to the real ToolCallback with the
+                                                         redacted args; RESULT redactors run on its
+                                                         result (failure → result withheld)
                                       DENY / not approved → structured refusal (no exception leak)
-                                      REDACT           → Redactor transforms args and/or result, then delegate
 ```
 
 ### Key types (core)
 
 - `ToolInvocation` (record): tool name, arguments (as a JSON tree), principal, conversation id, timestamp.
-- `Decision` (sealed interface): `Allow`, `Deny(reason)`, `RequireApproval(reason)`, `Redact(rules)`.
+- `Decision` (sealed interface): `Allow`, `Deny(reason)`, `RequireApproval(reason)`. Redaction is not a
+  decision: it is an obligation on calls that run (ADR 0015).
 - `Policy`: id, target tools (glob), condition, decision, priority.
+- `RedactionRule`: id, target tools (glob), condition, target (args / result), redactor names. Every
+  matching rule applies; order between rules and policies cannot drop one (ADR 0015).
 - `PolicyEngine`: evaluates policies in priority order; first match wins; if nothing matches,
   applies the configured default (`deny` by default).
 - `Receipt` (record): invocation id, tool, args HMAC-SHA256 (ADR 0004), decision, matched policy ids, approval
@@ -290,6 +296,8 @@ non-Spring frameworks, A2A protocol, multi-tenant policy management, remote poli
 
 - **Tool call / invocation**: one execution of a tool requested by the model.
 - **Policy**: rule that matches invocations and produces a decision.
-- **Decision**: ALLOW, DENY, REQUIRE_APPROVAL, REDACT.
+- **Decision**: ALLOW, DENY, REQUIRE_APPROVAL.
+- **Redaction**: an obligation that changes the arguments or result of a call that runs; every matching
+  redaction rule applies, whatever decided access (ADR 0015).
 - **Receipt**: signed, hash-chained record of one decision; the unit of audit.
 - **Approval gateway**: port that asks a human (or system) to approve a pending invocation.

@@ -129,7 +129,8 @@ filtro de contenido, no en lugar de uno.
 
 ## Funcionalidades
 
-- **Tres decisiones:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`. `REDACT` está previsto.
+- **Tres decisiones:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`. La redacción de argumentos y resultados está
+  prevista ([ADR 0015](docs/adr/0015-redaction.md)).
 - **Políticas declarativas:** globs de herramientas (`db_*`), prioridades y condiciones escritas en un
   SpEL aislado (`SimpleEvaluationContext`: sin referencias a tipos, sin acceso a beans, sin llamadas a métodos arbitrarios).
 - **Anotaciones:** `@RequiresApproval` en tus métodos `@Tool`. `@ToolPolicy(id = "...")` está previsto.
