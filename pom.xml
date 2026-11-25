@@ -48,6 +48,7 @@
         <module>countersign-spring-boot-starter</module>
         <module>countersign-audit-jdbc</module>
         <module>countersign-test</module>
+        <module>compat</module>
         <module>examples</module>
     </modules>
 
@@ -60,6 +61,12 @@
         <!-- Platform. Spring AI 2.0.2 is built against Spring Boot 4.1.2; keep them aligned. -->
         <spring-boot.version>4.1.2</spring-boot.version>
         <spring-ai.version>2.0.2</spring-ai.version>
+        <!--
+            The newest Spring AI line Countersign supports on top of the baseline. Only the classes in
+            countersign-spring-ai/src/main/spring-ai-2.1 are compiled against it, and compat/spring-ai-2.1 tests on it.
+            It never reaches users' dependency trees (ADR 0013).
+        -->
+        <spring-ai-2.1.version>2.1.0</spring-ai-2.1.version>
 
         <!-- Filled in by JaCoCo in the coverage profile; empty otherwise. -->
         <argLine/>
@@ -71,6 +78,7 @@
         <maven-clean-plugin.version>3.5.0</maven-clean-plugin.version>
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <maven-deploy-plugin.version>3.1.4</maven-deploy-plugin.version>
+        <maven-dependency-plugin.version>3.10.0</maven-dependency-plugin.version>
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
         <maven-install-plugin.version>3.1.4</maven-install-plugin.version>
@@ -196,6 +204,11 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-deploy-plugin</artifactId>
                     <version>${maven-deploy-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>${maven-dependency-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
@@ -326,8 +339,10 @@
                                 take over an hour and would time the build out after a successful upload.
                             -->
                             <waitUntil>validated</waitUntil>
-                            <!-- Examples are part of the build, not of the release. -->
+                            <!-- Examples and compatibility tests are part of the build, not of the release. -->
                             <excludeArtifacts>
+                                <artifact>countersign-compat</artifact>
+                                <artifact>countersign-compat-spring-ai-2.1</artifact>
                                 <artifact>countersign-examples</artifact>
                                 <artifact>countersign-example-banking-agent</artifact>
                                 <artifact>countersign-example-mcp-server-guarded</artifact>

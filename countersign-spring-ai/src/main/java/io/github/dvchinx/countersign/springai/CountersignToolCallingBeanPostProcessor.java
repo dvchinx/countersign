@@ -21,6 +21,9 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
  * this. The {@link ToolCallGuard} is resolved lazily from the {@link ObjectProvider}, on the first tool call, so
  * registering this processor does not create the policy engine or load keys early.
  *
+ * <p>On Spring AI 2.1 and later the wrapped manager can also resume tool calls paused for a person's confirmation, and
+ * guards them like any other call (see {@link GuardedToolCallingManager}).
+ *
  * <p>Not covered: a {@code ChatClient} built by hand with its own {@code ToolCallingManager} (wrap it with
  * {@link GuardedToolCallingManager#guard}), and tool callbacks invoked directly by application code (wrap them with
  * {@link GuardedToolCallback#guard}).
@@ -47,7 +50,7 @@ public final class CountersignToolCallingBeanPostProcessor implements BeanPostPr
                     "Countersign guards tool calls run by '{}' ({})",
                     beanName,
                     bean.getClass().getSimpleName());
-            return new GuardedToolCallingManager(manager, guard::getObject);
+            return GuardedToolCallingManager.create(manager, guard::getObject);
         }
         if (bean instanceof ToolCallbackResolver resolver && !(bean instanceof GuardedToolCallbackResolver)) {
             LOG.debug("Countersign guards tools resolved by '{}'", beanName);

@@ -75,6 +75,32 @@ class GuardedToolCallingManagerTest {
     }
 
     @Test
+    void loadsTheSpringAi21VariantOnlyWhenSpringAiCanResumeToolCalls() {
+        // The default build runs on the Spring AI 2.0 baseline, where the variant compiled against 2.1 must never be
+        // used; CI also runs this suite on 2.1, where it must be (compat/spring-ai-2.1 tests its behavior).
+        boolean springAi21 = hasClass("org.springframework.ai.model.tool.ToolCallDecisions");
+
+        ToolCallingManager manager =
+                GuardedToolCallingManager.guard(ToolCallingManager.builder().build(), guard);
+
+        assertThat(GuardedToolCallingManager.supportsToolCallDecisions()).isEqualTo(springAi21);
+        assertThat(manager.getClass().getName())
+                .isEqualTo(
+                        springAi21
+                                ? "io.github.dvchinx.countersign.springai.ResumableGuardedToolCallingManager"
+                                : GuardedToolCallingManager.class.getName());
+    }
+
+    private static boolean hasClass(String name) {
+        try {
+            Class.forName(name, false, ToolCallingManager.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
+    @Test
     void doesNotGuardTwice() {
         ToolCallingManager once =
                 GuardedToolCallingManager.guard(ToolCallingManager.builder().build(), guard);

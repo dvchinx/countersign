@@ -1,6 +1,7 @@
 package io.github.dvchinx.countersign.springai;
 
 import io.github.dvchinx.countersign.core.guard.ToolCallGuard;
+import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -29,14 +30,32 @@ import org.springframework.ai.tool.definition.ToolDefinition;
  * <p>The guard is looked up on each execution, through a supplier, so that this decorator can be created early in the
  * application context without forcing the policy engine and keys to be created with it. If the guard cannot be
  * obtained, the call fails with an exception and no tool runs (fail closed).
+ *
+ * <p><b>Spring AI 2.1 tool call confirmation.</b> Spring AI 2.1 can pause a batch of tool calls until a person
+ * decides on them, and resumes it through a third {@code executeToolCalls} method that takes the decisions. That
+ * method's type does not exist in Spring AI 2.0, so this class cannot override it. {@link #guard} and the
+ * {@link CountersignToolCallingBeanPostProcessor} therefore return a subclass, compiled against Spring AI 2.1, when
+ * the application runs on 2.1 or later: it guards the resumed calls exactly like the others, so a policy that denies
+ * a call wins over a person who allowed it. On Spring AI 2.0 that subclass is never loaded. An instance created with
+ * the constructor cannot resume: on 2.1 the resume fails with Spring AI's {@code UnsupportedOperationException} and no
+ * tool runs.
+ *
+ * <p>Not designed for extension; it is not {@code final} only for that subclass.
  */
-public final class GuardedToolCallingManager implements ToolCallingManager {
+public class GuardedToolCallingManager implements ToolCallingManager {
+
+    /** Compiled against Spring AI 2.1 from {@code src/main/spring-ai-2.1}; see ADR 0013. */
+    private static final String RESUMABLE_MANAGER =
+            "io.github.dvchinx.countersign.springai.ResumableGuardedToolCallingManager";
+
+    private static final String TOOL_CALL_DECISIONS = "org.springframework.ai.model.tool.ToolCallDecisions";
 
     private final ToolCallingManager delegate;
     private final Supplier<ToolCallGuard> guard;
 
     /**
-     * Wraps a manager.
+     * Wraps a manager. The result cannot resume calls paused for confirmation on Spring AI 2.1; prefer {@link #guard},
+     * which can.
      *
      * @param delegate the manager that actually runs tools
      * @param guard supplies the guard; called on every execution
@@ -60,9 +79,56 @@ public final class GuardedToolCallingManager implements ToolCallingManager {
      */
     public static ToolCallingManager guard(ToolCallingManager manager, ToolCallGuard guard) {
         Objects.requireNonNull(guard, "guard");
-        return manager instanceof GuardedToolCallingManager
-                ? manager
-                : new GuardedToolCallingManager(manager, () -> guard);
+        return manager instanceof GuardedToolCallingManager ? manager : create(manager, () -> guard);
+    }
+
+    /**
+     * Wraps a manager in the variant that matches the Spring AI on the classpath: one that can also resume calls
+     * paused for confirmation when Spring AI supports it (2.1 and later), this class otherwise.
+     *
+     * @param delegate the manager that actually runs tools
+     * @param guard supplies the guard; called on every execution
+     * @return the guarded manager
+     * @throws IllegalStateException if Spring AI supports tool call decisions but the resumable variant cannot be
+     *     created, which means the Countersign jar is incomplete; no unguarded manager is returned instead
+     */
+    static GuardedToolCallingManager create(ToolCallingManager delegate, Supplier<ToolCallGuard> guard) {
+        if (!supportsToolCallDecisions()) {
+            return new GuardedToolCallingManager(delegate, guard);
+        }
+        try {
+            // By name: this class is compiled against Spring AI 2.0 and cannot see the 2.1 one.
+            return Class.forName(RESUMABLE_MANAGER, true, GuardedToolCallingManager.class.getClassLoader())
+                    .asSubclass(GuardedToolCallingManager.class)
+                    .getDeclaredConstructor(ToolCallingManager.class, Supplier.class)
+                    .newInstance(delegate, guard);
+        } catch (InvocationTargetException e) {
+            if (e.getCause() instanceof RuntimeException cause) {
+                throw cause;
+            }
+            throw new IllegalStateException("Cannot create " + RESUMABLE_MANAGER, e.getCause());
+        } catch (ReflectiveOperationException | LinkageError e) {
+            throw new IllegalStateException(
+                    "Spring AI supports tool call decisions, but Countersign cannot load " + RESUMABLE_MANAGER
+                            + "; check that countersign-spring-ai is complete and matches the Spring AI version",
+                    e);
+        }
+    }
+
+    /**
+     * Whether the Spring AI on the classpath can resume tool calls with a person's decisions (Spring AI 2.1+).
+     *
+     * @return {@code true} if {@code ToolCallingManager} declares {@code executeToolCalls(Prompt, ChatResponse,
+     *     ToolCallDecisions)}
+     */
+    static boolean supportsToolCallDecisions() {
+        try {
+            Class<?> decisions = Class.forName(TOOL_CALL_DECISIONS, false, ToolCallingManager.class.getClassLoader());
+            ToolCallingManager.class.getMethod("executeToolCalls", Prompt.class, ChatResponse.class, decisions);
+            return true;
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
+            return false;
+        }
     }
 
     /**
@@ -70,22 +136,28 @@ public final class GuardedToolCallingManager implements ToolCallingManager {
      *
      * @return the manager that actually runs tools
      */
-    public ToolCallingManager getDelegate() {
+    public final ToolCallingManager getDelegate() {
         return delegate;
     }
 
     @Override
-    public List<ToolDefinition> resolveToolDefinitions(ToolCallingChatOptions chatOptions) {
+    public final List<ToolDefinition> resolveToolDefinitions(ToolCallingChatOptions chatOptions) {
         // What the model is offered does not need guarding; what it calls does.
         return delegate.resolveToolDefinitions(chatOptions);
     }
 
     @Override
-    public ToolExecutionResult executeToolCalls(Prompt prompt, ChatResponse chatResponse) {
+    public final ToolExecutionResult executeToolCalls(Prompt prompt, ChatResponse chatResponse) {
         return delegate.executeToolCalls(guarded(prompt), chatResponse);
     }
 
-    private Prompt guarded(Prompt prompt) {
+    /**
+     * Returns the prompt with its tool callbacks replaced by guarded ones.
+     *
+     * @param prompt the prompt the wrapped manager would run
+     * @return the same prompt if it carries no tools, a copy with guarded tools otherwise
+     */
+    final Prompt guarded(Prompt prompt) {
         if (!(prompt.getOptions() instanceof ToolCallingChatOptions options)) {
             return prompt;
         }

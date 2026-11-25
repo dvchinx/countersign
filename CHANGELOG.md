@@ -7,7 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- On Spring AI 2.1, a reply paused for tool call confirmation can be resumed while Countersign is active
+  ([#10](https://github.com/dvchinx/countersign/issues/10), [ADR 0013](docs/adr/0013-spring-ai-2.1-without-dropping-2.0.md)).
+  The guarded `ToolCallingManager` now implements `executeToolCalls(prompt, response, decisions)` and checks every
+  call a person allowed against the policies, so a policy `deny` wins over a person's `allow`. Before, the resume
+  failed with `UnsupportedOperationException` and no tool ran. Spring AI 2.0.x stays the baseline and is unaffected.
+
 ### Changed
+
+- CI runs the full test suite on Spring AI 2.0.2 and 2.1.0. A new, unpublished `compat/spring-ai-2.1` module tests
+  tool call confirmation on Spring AI 2.1 in every build.
+- `GuardedToolCallingManager` is no longer `final` (its methods are), so that its Spring AI 2.1 variant can extend it.
 
 - The READMEs list the steps of a tool call in the order they happen: the receipt is recorded before the tool runs.
 - The release build waits until the Central Portal validates the bundle instead of until it is published, so slow

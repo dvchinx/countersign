@@ -14,7 +14,7 @@
   <a href="https://central.sonatype.com/artifact/io.github.dvchinx/countersign-spring-boot-starter"><img alt="Maven Central" src="https://img.shields.io/maven-central/v/io.github.dvchinx/countersign-spring-boot-starter"></a>
   <a href="https://github.com/dvchinx/countersign/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/dvchinx/countersign/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Java 21" src="https://img.shields.io/badge/java-21-blue?logo=openjdk&logoColor=white">
-  <img alt="Spring AI 2.0" src="https://img.shields.io/badge/spring%20ai-2.0.x-6DB33F?logo=spring&logoColor=white">
+  <img alt="Spring AI 2.0 and 2.1" src="https://img.shields.io/badge/spring%20ai-2.0.x%20%7C%202.1.x-6DB33F?logo=spring&logoColor=white">
   <img alt="Licencia: Apache 2.0" src="https://img.shields.io/badge/licencia-Apache%202.0-blue">
   <a href="https://github.com/dvchinx/countersign/stargazers"><img alt="Estrellas en GitHub" src="https://img.shields.io/github/stars/dvchinx/countersign?style=social"></a>
 </p>
@@ -300,8 +300,11 @@ tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envu�
 | `countersign-test`                | Utilidades de test y tests de contrato para las SPIs                  |
 | `examples/banking-agent`          | Demo principal: un agente que consulta saldos y mueve dinero          |
 | `examples/mcp-server-guarded`     | Protección de herramientas expuestas a través de un servidor MCP      |
+| `compat/spring-ai-2.1`            | Tests sobre Spring AI 2.1 (confirmación de llamadas); no se publica   |
 
-**Requisitos:** Java 21, Spring Boot 4.x, Spring AI 2.0.1 o superior.
+**Requisitos:** Java 21, Spring Boot 4.x, Spring AI 2.0.1 o superior. Probado con Spring AI 2.0 y 2.1. En la 2.1,
+la confirmación de llamadas a herramientas de Spring AI funciona con Countersign: una llamada que una persona confirma
+sigue pasando por tus políticas, y un `deny` de una política gana al `allow` de la persona.
 
 ## Hoja de ruta hacia la 0.1.0
 
