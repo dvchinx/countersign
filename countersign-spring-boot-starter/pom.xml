@@ -72,4 +72,22 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <configuration>
+                        <!--
+                            Property accessors carry no Javadoc of their own: each property is documented on its field,
+                            which is where the configuration processor reads it for IDE metadata.
+                        -->
+                        <doclint>all,-missing</doclint>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>
