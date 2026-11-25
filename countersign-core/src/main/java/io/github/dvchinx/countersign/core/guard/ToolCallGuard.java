@@ -14,6 +14,7 @@ import io.github.dvchinx.countersign.core.receipt.ReceiptChain;
 import io.github.dvchinx.countersign.core.spi.ApprovalGateway;
 import io.github.dvchinx.countersign.core.spi.AuditSink;
 import io.github.dvchinx.countersign.core.spi.DecisionListener;
+import io.github.dvchinx.countersign.core.spi.PrincipalResolver;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -25,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -36,6 +38,7 @@ import org.jspecify.annotations.Nullable;
  * (fail closed):
  *
  * <ul>
+ *   <li>a {@link PrincipalResolver} that throws: refused without a receipt, before any policy is evaluated;
  *   <li>a policy that throws: the engine denies, and the denial is recorded;
  *   <li>arguments that cannot be read: see {@link #refuseInvalidArguments};
  *   <li>an approval that is rejected, times out, or cannot be asked (no gateway, gateway error): refused and recorded
@@ -43,6 +46,10 @@ import org.jspecify.annotations.Nullable;
  *   <li>a receipt that cannot be hashed or signed: refused without a receipt;
  *   <li>an audit sink that throws: logged as an error, and refused when strict auditing is on.
  * </ul>
+ *
+ * <p>When the invocation carries no principal and a {@link PrincipalResolver} is set, the guard asks it who the call
+ * acts for, and evaluates and records the invocation with that principal. A principal the adapter passed explicitly
+ * is never replaced.
  *
  * <p>Once a call is decided, every {@link DecisionListener} hears about it, before the tool runs. A listener that
  * throws is logged and ignored; it never changes the verdict.
@@ -60,6 +67,8 @@ public final class ToolCallGuard {
 
     private static final String RECEIPT_FAILED = "The call was blocked because Countersign could not record it";
     private static final String AUDIT_FAILED = "The call was blocked because Countersign could not store its record";
+    private static final String PRINCIPAL_FAILED =
+            "The call was blocked because Countersign could not tell who it acts for";
 
     private final PolicyEngine engine;
     private final ReceiptChain receipts;
@@ -69,6 +78,8 @@ public final class ToolCallGuard {
     private final boolean strictAudit;
     private final Clock clock;
     private final List<DecisionListener> listeners;
+    private final @Nullable PrincipalResolver principalResolver;
+    private final AtomicBoolean missingPrincipalReported = new AtomicBoolean();
 
     private ToolCallGuard(Builder builder) {
         this.engine = builder.engine;
@@ -79,6 +90,7 @@ public final class ToolCallGuard {
         this.strictAudit = builder.strictAudit;
         this.clock = builder.clock;
         this.listeners = List.copyOf(builder.listeners);
+        this.principalResolver = builder.principalResolver;
     }
 
     /**
@@ -102,6 +114,17 @@ public final class ToolCallGuard {
      */
     public Verdict check(ToolInvocation invocation) {
         Objects.requireNonNull(invocation, "invocation");
+        try {
+            invocation = withPrincipal(invocation);
+        } catch (RuntimeException e) {
+            LOG.log(
+                    System.Logger.Level.ERROR,
+                    "Could not tell who tool ''{0}'' acts for ({1}); refusing the call",
+                    invocation.toolName(),
+                    e.getClass().getName());
+            LOG.log(System.Logger.Level.DEBUG, "Principal resolver failure details", e);
+            return new Verdict.Refuse(Decision.Type.DENY, PRINCIPAL_FAILED, null);
+        }
         long start = System.nanoTime();
         EvaluationResult result = engine.evaluate(invocation);
         Duration evaluationTime = Duration.ofNanos(System.nanoTime() - start);
@@ -123,7 +146,7 @@ public final class ToolCallGuard {
      *
      * @param toolName the tool the model tried to call
      * @param invocationId the id to record
-     * @param principal who the agent acts for, or {@code null}
+     * @param principal who the agent acts for, or {@code null} to ask the {@link PrincipalResolver}, if any
      * @param conversationId the conversation, or {@code null}
      * @param timestamp when the call was received
      * @return always a {@link Verdict.Refuse}
@@ -134,9 +157,58 @@ public final class ToolCallGuard {
             @Nullable String principal,
             @Nullable String conversationId,
             Instant timestamp) {
+        if (principal == null && principalResolver != null) {
+            try {
+                principal = resolvePrincipal(toolName);
+            } catch (RuntimeException e) {
+                // The call is refused anyway; record it without a principal rather than not at all.
+                LOG.log(
+                        System.Logger.Level.ERROR,
+                        "Could not tell who tool ''{0}'' acts for ({1})",
+                        toolName,
+                        e.getClass().getName());
+                LOG.log(System.Logger.Level.DEBUG, "Principal resolver failure details", e);
+            }
+        }
         ToolInvocation invocation =
                 new ToolInvocation(invocationId, toolName, JsonObject.empty(), principal, conversationId, timestamp);
         return decide(invocation, EvaluationResult.invalidArguments(), null, Duration.ZERO);
+    }
+
+    /** Returns the invocation with the resolver's principal when it has none of its own. */
+    private ToolInvocation withPrincipal(ToolInvocation invocation) {
+        if (invocation.principal() != null || principalResolver == null) {
+            return invocation;
+        }
+        String principal = resolvePrincipal(invocation.toolName());
+        return principal == null
+                ? invocation
+                : new ToolInvocation(
+                        invocation.id(),
+                        invocation.toolName(),
+                        invocation.arguments(),
+                        principal,
+                        invocation.conversationId(),
+                        invocation.timestamp());
+    }
+
+    /** Asks the resolver, treating a blank name as unknown; warns once if a call has no principal. */
+    private @Nullable String resolvePrincipal(String toolName) {
+        PrincipalResolver resolver = Objects.requireNonNull(principalResolver);
+        String principal = resolver.currentPrincipal();
+        if (principal != null && !principal.isBlank()) {
+            return principal;
+        }
+        if (missingPrincipalReported.compareAndSet(false, true)) {
+            LOG.log(
+                    System.Logger.Level.WARNING,
+                    "Tool ''{0}'' was called with no principal: {1} returned none, so the receipt does not say who"
+                            + " asked for it. If the user is signed in, the tool may run on a thread that does not"
+                            + " carry their security context. This warning is shown once.",
+                    toolName,
+                    resolver.getClass().getName());
+        }
+        return null;
     }
 
     /** The answer to an approval request, as Countersign records and reports it. */
@@ -312,6 +384,7 @@ public final class ToolCallGuard {
         private boolean strictAudit;
         private Clock clock = Clock.systemUTC();
         private final List<DecisionListener> listeners = new ArrayList<>();
+        private @Nullable PrincipalResolver principalResolver;
 
         private Builder(PolicyEngine engine, ReceiptChain receipts, AuditSink auditSink) {
             this.engine = Objects.requireNonNull(engine, "engine");
@@ -377,6 +450,18 @@ public final class ToolCallGuard {
          */
         public Builder listener(DecisionListener listener) {
             listeners.add(Objects.requireNonNull(listener, "listener"));
+            return this;
+        }
+
+        /**
+         * Sets who is asked for the principal of a call that carries none. Without one, such calls are evaluated
+         * and recorded with no principal.
+         *
+         * @param principalResolver the resolver, or {@code null} for none
+         * @return this builder
+         */
+        public Builder principalResolver(@Nullable PrincipalResolver principalResolver) {
+            this.principalResolver = principalResolver;
             return this;
         }
 

@@ -131,6 +131,8 @@ content filter, not instead of one.
   (`SimpleEvaluationContext`: no type references, no bean access, no arbitrary method calls).
 - **Annotations:** `@RequiresApproval` on your `@Tool` methods. `@ToolPolicy(id = "...")` is planned.
 - **Human in the loop:** a pluggable `ApprovalGateway`. Countersign waits up to a timeout, denies if nobody answers, and records the approver in the receipt.
+- **Who asked:** with Spring Security, the signed-in user is the call's principal, in policies (`#principal`) and in the
+  receipt, with no code. Any other source plugs in through `PrincipalResolver`.
 - **Tamper-evident receipts:** canonical JSON, a SHA-256 hash chain and Ed25519 signatures using only
   `java.security`, plus a verification utility that detects any edited or deleted receipt.
 - **Privacy by default:** receipts store a keyed hash (HMAC) of the arguments, so values cannot be recovered by guessing. Raw values are never stored.
@@ -268,6 +270,21 @@ approvals.reject(invocationId, currentUser(), "Unknown payee");
 
 The agent's request waits while the approval is pending, so keep the timeout below any HTTP timeout in front of it.
 
+**Who the agent acts for.** Each receipt records the principal, and policies can test it (`#principal == 'alice'`).
+With Spring Security in the application, it is the signed-in user, with no code; anonymous users count as unknown. To
+set it yourself, for example for a batch job, put it in the tool context, which always wins:
+
+```java
+chatClient.prompt(question)
+        .toolContext(Map.of(GuardedToolCallback.PRINCIPAL_KEY, "nightly-reconciliation"))
+        .call();
+```
+
+The security context is bound to a thread. With `.stream()`, Spring AI runs tools on a Reactor thread, which only
+carries the user with `spring.reactor.context-propagation=auto`; otherwise the call is recorded without a principal
+and Countersign warns once. To read the principal from somewhere else, define a `PrincipalResolver` bean. If it
+throws, the call is refused.
+
 **What is guarded.** Every tool run by a `ChatClient` from the auto-configured `ChatClient.Builder`, however the tool
 was registered: `.tools(myTools)`, `defaultTools(...)`, `ToolCallbackProvider`s (MCP clients included), or Spring
 AI's resolution by name. A `ChatClient` you build yourself with `ChatClient.create(model)` has its own tool manager:
@@ -323,6 +340,7 @@ touching the policy engine:
 - **`ApprovalGateway`:** Slack, Teams, email or a web console approver
 - **`AuditSink`:** Kafka, S3, OpenSearch, or your SIEM
 - **`ReceiptSigner`:** KMS / HSM-backed signing
+- **`PrincipalResolver`:** who the agent acts for, from a gateway header, a JWT or an MCP client's identity
 
 Passing the port's contract test in `countersign-test` is the bar for merging (`AuditSinkContract` today;
 contracts for the other ports are good first contributions). Start with [`CONTRIBUTING.md`](CONTRIBUTING.md);

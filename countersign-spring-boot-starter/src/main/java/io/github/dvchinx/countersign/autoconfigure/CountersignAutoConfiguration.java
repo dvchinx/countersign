@@ -10,9 +10,11 @@ import io.github.dvchinx.countersign.core.receipt.ReceiptChain;
 import io.github.dvchinx.countersign.core.spi.ApprovalGateway;
 import io.github.dvchinx.countersign.core.spi.AuditSink;
 import io.github.dvchinx.countersign.core.spi.DecisionListener;
+import io.github.dvchinx.countersign.core.spi.PrincipalResolver;
 import io.github.dvchinx.countersign.core.spi.ReceiptSigner;
 import io.github.dvchinx.countersign.springai.CountersignToolCallingBeanPostProcessor;
 import io.github.dvchinx.countersign.springai.annotation.RequiresApprovalPolicies;
+import io.github.dvchinx.countersign.springai.security.SpringSecurityPrincipalResolver;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HexFormat;
@@ -28,12 +30,14 @@ import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackages;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.security.core.context.SecurityContextHolderStrategy;
 
 /**
  * Auto-configuration for Countersign: builds the policy engine from {@code countersign.policies}, sets up signed
@@ -43,6 +47,10 @@ import org.springframework.core.env.Environment;
  * persistent {@link AuditSink}, a KMS-backed {@link ReceiptSigner}, or a {@link PolicyEngine} built in code.
  * {@link Policy} beans are added to the configured policies, and every {@link DecisionListener} bean hears about each
  * decision.
+ *
+ * <p>When Spring Security is on the classpath, the signed-in user becomes the principal of every tool call that does
+ * not carry one in its tool context ({@link SpringSecurityPrincipalResolver}); a {@link PrincipalResolver} bean of the
+ * application's own replaces it.
  *
  * <p>With {@code countersign.enabled=false} nothing is guarded, and a warning says so at startup.
  */
@@ -126,9 +134,11 @@ public class CountersignAutoConfiguration {
                 AuditSink auditSink,
                 ObjectProvider<ApprovalGateway> approvals,
                 ObjectProvider<DecisionListener> listeners,
+                ObjectProvider<PrincipalResolver> principals,
                 CountersignProperties properties) {
             ToolCallGuard.Builder guard = ToolCallGuard.builder(engine, receipts, auditSink)
                     .approvals(approvals.getIfUnique())
+                    .principalResolver(principals.getIfUnique())
                     .approvalTimeout(properties.getApproval().getTimeout())
                     .strictAudit(properties.getAudit().isStrict());
             listeners.orderedStream().forEach(guard::listener);
@@ -141,14 +151,16 @@ public class CountersignAutoConfiguration {
                 ReceiptChain receipts,
                 AuditSink auditSink,
                 ObjectProvider<ApprovalGateway> approvals,
+                ObjectProvider<PrincipalResolver> principals,
                 CountersignProperties properties) {
             return () -> {
                 ApprovalGateway gateway = approvals.getIfUnique();
+                PrincipalResolver principalResolver = principals.getIfUnique();
                 int total =
                         engine.policies().size() + engine.mandatoryPolicies().size();
                 LOG.info(
                         "Countersign is active: {} {} ({} from @RequiresApproval), default decision {}, receipts"
-                                + " stream '{}', audit sink {}{}, approvals {}",
+                                + " stream '{}', audit sink {}{}, approvals {}, principal from {}",
                         total,
                         total == 1 ? "policy" : "policies",
                         engine.mandatoryPolicies().size(),
@@ -159,7 +171,11 @@ public class CountersignAutoConfiguration {
                         gateway == null
                                 ? "none"
                                 : gateway.getClass().getSimpleName() + " (timeout "
-                                        + properties.getApproval().getTimeout() + ")");
+                                        + properties.getApproval().getTimeout() + ")",
+                        principalResolver == null
+                                ? "tool context only"
+                                : "tool context, then "
+                                        + principalResolver.getClass().getSimpleName());
                 boolean approvalNeeded = engine.defaultDecision().type() == Decision.Type.REQUIRE_APPROVAL
                         || Stream.concat(engine.policies().stream(), engine.mandatoryPolicies().stream())
                                 .anyMatch(policy -> policy.decision().type() == Decision.Type.REQUIRE_APPROVAL);
@@ -177,6 +193,20 @@ public class CountersignAutoConfiguration {
                             + " Define an AuditSink bean to store them.");
                 }
             };
+        }
+    }
+
+    /** The signed-in Spring Security user as the principal of each call. */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnBooleanProperty(name = "countersign.enabled", matchIfMissing = true)
+    @ConditionalOnClass(name = "org.springframework.security.core.context.SecurityContextHolder")
+    static class SpringSecurityPrincipal {
+
+        @Bean
+        @ConditionalOnMissingBean
+        PrincipalResolver countersignPrincipalResolver(ObjectProvider<SecurityContextHolderStrategy> strategy) {
+            SecurityContextHolderStrategy custom = strategy.getIfUnique();
+            return custom == null ? new SpringSecurityPrincipalResolver() : new SpringSecurityPrincipalResolver(custom);
         }
     }
 

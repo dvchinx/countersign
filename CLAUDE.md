@@ -65,7 +65,7 @@ countersign/
 │       ├── model/                  # ToolInvocation, Decision, PolicyMatch, Receipt...
 │       ├── policy/                 # Policy, PolicyEngine, condition evaluation
 │       ├── receipt/                # Receipt building, hash chaining, signing
-│       └── spi/                    # Ports: AuditSink, ApprovalGateway, Redactor, ReceiptSigner, DecisionListener
+│       └── spi/                    # Ports: AuditSink, ApprovalGateway, Redactor, ReceiptSigner, DecisionListener, PrincipalResolver
 ├── countersign-spring-ai/             # Adapters: wraps ToolCallback / ToolCallbackProvider
 ├── countersign-spring-boot-starter/   # Auto-configuration + @ConfigurationProperties
 ├── countersign-audit-jdbc/            # AuditSink implementation (PostgreSQL, append-only)

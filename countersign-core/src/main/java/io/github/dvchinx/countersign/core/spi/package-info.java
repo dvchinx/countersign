@@ -1,6 +1,6 @@
 /**
- * Ports to the outside world ({@code AuditSink}, {@code ApprovalGateway}, {@code Redactor},
- * {@code ReceiptSigner}). Each port is kept to one method where possible so it can be implemented with a lambda.
+ * Ports to the outside world ({@code AuditSink}, {@code ApprovalGateway}, {@code ReceiptSigner},
+ * {@code DecisionListener}, {@code PrincipalResolver}). Each port is kept to one method where possible so it can be implemented with a lambda.
  * Part of the public API.
  */
 @NullMarked

@@ -134,6 +134,8 @@ filtro de contenido, no en lugar de uno.
   SpEL aislado (`SimpleEvaluationContext`: sin referencias a tipos, sin acceso a beans, sin llamadas a métodos arbitrarios).
 - **Anotaciones:** `@RequiresApproval` en tus métodos `@Tool`. `@ToolPolicy(id = "...")` está previsto.
 - **Humano en el ciclo:** un `ApprovalGateway` intercambiable. Countersign espera hasta un plazo, deniega si nadie responde y guarda en el recibo quién aprobó.
+- **Quién lo pidió:** con Spring Security, el usuario autenticado es el principal de la llamada, en las políticas
+  (`#principal`) y en el recibo, sin escribir código. Cualquier otra fuente se conecta con `PrincipalResolver`.
 - **Recibos a prueba de manipulación:** JSON canónico, cadena de hashes SHA-256 y firmas Ed25519 usando solo
   `java.security`, más una utilidad de verificación que detecta cualquier recibo editado o borrado.
 - **Privacidad por defecto:** los recibos guardan un hash con clave (HMAC) de los argumentos, así que los valores no se pueden recuperar probando candidatos. Los valores en crudo nunca se guardan.
@@ -274,6 +276,22 @@ approvals.reject(invocationId, currentUser(), "Beneficiario desconocido");
 La petición del agente espera mientras la aprobación está pendiente, así que el plazo debe ser menor que cualquier
 timeout HTTP que haya delante.
 
+**En nombre de quién actúa el agente.** Cada recibo guarda el principal, y las políticas pueden usarlo
+(`#principal == 'alice'`). Si la aplicación usa Spring Security, es el usuario autenticado, sin escribir código; los
+usuarios anónimos cuentan como desconocidos. Para fijarlo tú, por ejemplo en un proceso batch, ponlo en el contexto de
+la herramienta, que siempre tiene prioridad:
+
+```java
+chatClient.prompt(question)
+        .toolContext(Map.of(GuardedToolCallback.PRINCIPAL_KEY, "nightly-reconciliation"))
+        .call();
+```
+
+El contexto de seguridad va ligado a un hilo. Con `.stream()`, Spring AI ejecuta las herramientas en un hilo de
+Reactor, que solo lleva el usuario con `spring.reactor.context-propagation=auto`; si no, la llamada se registra sin
+principal y Countersign avisa una vez. Para leer el principal de otro sitio, define un bean `PrincipalResolver`. Si
+lanza una excepción, la llamada se rechaza.
+
 **Qué queda protegido.** Toda herramienta que ejecute un `ChatClient` creado desde el `ChatClient.Builder`
 autoconfigurado, se haya registrado como se haya registrado: `.tools(misHerramientas)`, `defaultTools(...)`,
 `ToolCallbackProvider`s (incluidos clientes MCP) o la resolución por nombre de Spring AI. Un `ChatClient` que crees
@@ -330,6 +348,8 @@ tocar el motor de políticas:
 - **`ApprovalGateway`:** aprobaciones por Slack, Teams, correo o una consola web
 - **`AuditSink`:** Kafka, S3, OpenSearch o tu SIEM
 - **`ReceiptSigner`:** firma respaldada por KMS / HSM
+- **`PrincipalResolver`:** en nombre de quién actúa el agente, desde una cabecera del gateway, un JWT o la identidad
+  de un cliente MCP
 
 Pasar el test de contrato del puerto en `countersign-test` es el requisito para hacer merge (hoy existe
 `AuditSinkContract`; escribir los contratos de los otros puertos es una buena primera contribución). Empieza por

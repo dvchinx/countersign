@@ -13,6 +13,7 @@ import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.tool.ToolCallingChatOptions;
+import reactor.core.publisher.Flux;
 
 /**
  * A chat model for tests: on its first turn it requests one tool call, on the next it answers "done". It keeps every
@@ -35,6 +36,12 @@ final class ScriptedChatModel implements ChatModel {
     public ChatResponse call(Prompt prompt) {
         prompts.add(prompt);
         return new ChatResponse(List.of(new Generation(script.removeFirst())));
+    }
+
+    /** Streams each scripted turn as a single chunk. */
+    @Override
+    public Flux<ChatResponse> stream(Prompt prompt) {
+        return Flux.defer(() -> Flux.just(call(prompt)));
     }
 
     @Override

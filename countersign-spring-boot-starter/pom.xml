@@ -29,6 +29,12 @@
             <artifactId>countersign-audit-jdbc</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- Used when the application has Spring Security: the signed-in user becomes the call's principal. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
