@@ -98,9 +98,11 @@ On startup you'll see one line telling you Countersign is active and which defau
 </p>
 
 1. **Build** a `ToolInvocation`: tool name, parsed arguments, principal, conversation id.
-2. **Evaluate** it against your policies, in priority order. The first match wins; if nothing matches, the default (`deny`) applies.
-3. **Apply** the decision: run the tool, refuse it, or ask a human first.
-4. **Record** a receipt: the decision, the matched policies, who approved it, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
+2. **Evaluate** it against your policies, in priority order. The first match wins; if nothing matches, the default (`deny`) applies. On `REQUIRE_APPROVAL`, wait for a human until the timeout.
+3. **Record** a receipt: the decision, the matched policies, who approved it, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
+4. **Apply** the decision: run the tool if it was allowed or approved, otherwise return a structured refusal.
+
+The receipt is signed before the tool runs: if signing fails, the tool does not run.
 5. **Publish** it to your `AuditSink`, along with Micrometer metrics and observations.
 
 Enforcement happens **where the tool runs**, not in the list of tools sent to the model. A tool the
