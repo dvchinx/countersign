@@ -1,0 +1,51 @@
+name: Release
+
+# Publishes to Maven Central when a version tag is pushed, e.g. `git tag v0.1.0 && git push origin v0.1.0`.
+# See docs/adr/0012-releasing-to-maven-central.md.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to Maven Central
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          # Writes ~/.m2/settings.xml with server "central", read by central-publishing-maven-plugin.
+          server-id: central
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_TOKEN
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      # A tag that does not match the POM would publish the wrong version, and Central versions are immutable.
+      - name: Check tag matches project version
+        run: |
+          version=$(./mvnw --batch-mode --no-transfer-progress help:evaluate -Dexpression=project.version -q -DforceStdout)
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match project version ${version}"
+            exit 1
+          fi
+          case "${version}" in *-SNAPSHOT) echo "::error::Refusing to release a SNAPSHOT"; exit 1;; esac
+
+      # Runs the full test suite (Testcontainers included), then signs, uploads and waits until Central publishes.
+      - name: Deploy
+        run: ./mvnw --batch-mode --no-transfer-progress -Prelease deploy
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}

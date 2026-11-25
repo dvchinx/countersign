@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Releases to Maven Central ([ADR 0012](docs/adr/0012-releasing-to-maven-central.md)): a `release` profile that
+  attaches sources and javadoc, signs with GPG and publishes through the Central Portal, and a GitHub Actions
+  workflow that publishes when a `v*` tag matching the POM version is pushed. Examples are never published.
 - The README's demo GIF, recorded from the running banking-agent example with VHS. `examples/banking-agent/demo`
   holds the helper commands and the tape, so the GIF can be re-recorded after any change.
 - `banking-agent` example: an agent with balance, transfer and SQL tools over an in-memory bank, guarded with no

@@ -27,6 +27,9 @@ public final class InMemoryApprovalGateway implements ApprovalGateway {
 
     private record Pending(ApprovalRequest request, CompletableFuture<ApprovalDecision> answer) {}
 
+    /** Creates a gateway with no pending requests; register it as the application's {@link ApprovalGateway}. */
+    public InMemoryApprovalGateway() {}
+
     @Override
     public CompletionStage<ApprovalDecision> request(ApprovalRequest request) {
         Objects.requireNonNull(request, "request");
