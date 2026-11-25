@@ -11,7 +11,7 @@
 
 <p align="center">
   <img alt="Status: pre-alpha" src="https://img.shields.io/badge/status-pre--alpha-orange">
-  <img alt="Maven Central: 0.1.0 coming soon" src="https://img.shields.io/badge/maven%20central-0.1.0%20coming%20soon-lightgrey">
+  <a href="https://central.sonatype.com/artifact/io.github.dvchinx/countersign-spring-boot-starter"><img alt="Maven Central" src="https://img.shields.io/maven-central/v/io.github.dvchinx/countersign-spring-boot-starter"></a>
   <a href="https://github.com/dvchinx/countersign/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/dvchinx/countersign/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Java 21" src="https://img.shields.io/badge/java-21-blue?logo=openjdk&logoColor=white">
   <img alt="Spring AI 2.0" src="https://img.shields.io/badge/spring%20ai-2.0.x-6DB33F?logo=spring&logoColor=white">
@@ -51,7 +51,8 @@ Try it yourself in two minutes, with no API key and no Docker: `./mvnw -pl examp
 
 ## Quickstart
 
-> **Pre-alpha:** this is the API we are building toward `0.1.0`. Watch the repo to know when it lands.
+> **Pre-alpha:** `0.1.0` is the first release. APIs may still change before `1.0`; every breaking change is listed
+> in the [CHANGELOG](CHANGELOG.md).
 
 **1. Add the starter**
 
@@ -305,7 +306,7 @@ wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Build
 - [x] Micrometer metrics and observations
 - [x] `banking-agent` example
 - [x] Demo GIF
-- [ ] Published to Maven Central
+- [x] Published to Maven Central
 
 Not planned for `0.1.0`: LLM-based classifiers, a UI dashboard, non-Spring frameworks, A2A, or a remote policy server.
 

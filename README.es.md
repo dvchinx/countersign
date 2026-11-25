@@ -11,7 +11,7 @@
 
 <p align="center">
   <img alt="Estado: pre-alpha" src="https://img.shields.io/badge/estado-pre--alpha-orange">
-  <img alt="Maven Central: 0.1.0 muy pronto" src="https://img.shields.io/badge/maven%20central-0.1.0%20muy%20pronto-lightgrey">
+  <a href="https://central.sonatype.com/artifact/io.github.dvchinx/countersign-spring-boot-starter"><img alt="Maven Central" src="https://img.shields.io/maven-central/v/io.github.dvchinx/countersign-spring-boot-starter"></a>
   <a href="https://github.com/dvchinx/countersign/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/dvchinx/countersign/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Java 21" src="https://img.shields.io/badge/java-21-blue?logo=openjdk&logoColor=white">
   <img alt="Spring AI 2.0" src="https://img.shields.io/badge/spring%20ai-2.0.x-6DB33F?logo=spring&logoColor=white">
@@ -53,7 +53,8 @@ Pruébalo en dos minutos, sin API key y sin Docker: `./mvnw -pl examples/banking
 
 ## Inicio rápido
 
-> **Pre-alpha:** esta es la API que estamos construyendo para la `0.1.0`. Dale *Watch* al repo para enterarte cuando salga.
+> **Pre-alpha:** la `0.1.0` es la primera versión publicada. La API todavía puede cambiar antes de la `1.0`; cada cambio
+> incompatible aparece en el [CHANGELOG](CHANGELOG.md).
 
 **1. Agrega el starter**
 
@@ -312,7 +313,7 @@ tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envu�
 - [x] Métricas y observaciones de Micrometer
 - [x] Ejemplo `banking-agent`
 - [x] GIF de demo
-- [ ] Publicado en Maven Central
+- [x] Publicado en Maven Central
 
 No está previsto para la `0.1.0`: clasificadores basados en LLM, un panel web, frameworks que no sean Spring, A2A ni un servidor remoto de políticas.
 
