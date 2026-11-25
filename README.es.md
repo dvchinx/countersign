@@ -100,7 +100,7 @@ Al arrancar verás una línea en el log que indica que Countersign está activo 
 
 1. **Construye** un `ToolInvocation`: nombre de la herramienta, argumentos parseados, principal e id de conversación.
 2. **Evalúa** la invocación contra tus políticas, en orden de prioridad. Gana la primera que coincide; si ninguna coincide, se aplica la decisión por defecto (`deny`).
-3. **Aplica** la decisión: ejecuta la herramienta, la rechaza, le pregunta a un humano o redacta los datos.
+3. **Aplica** la decisión: ejecuta la herramienta, la rechaza o primero le pregunta a un humano.
 4. **Registra** un recibo: la decisión, las políticas que coincidieron, quién la aprobó, un hash con clave (HMAC-SHA256) de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
 5. **Publica** el recibo en tu `AuditSink`, junto con métricas y observaciones de Micrometer.
 
@@ -126,14 +126,14 @@ filtro de contenido, no en lugar de uno.
 
 ## Funcionalidades
 
-- **Cuatro decisiones:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`, `REDACT`.
+- **Tres decisiones:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`. `REDACT` está previsto.
 - **Políticas declarativas:** globs de herramientas (`db_*`), prioridades y condiciones escritas en un
   SpEL aislado (`SimpleEvaluationContext`: sin referencias a tipos, sin acceso a beans, sin llamadas a métodos arbitrarios).
-- **Anotaciones:** `@RequiresApproval` y `@ToolPolicy(id = "...")` en tus métodos `@Tool`.
+- **Anotaciones:** `@RequiresApproval` en tus métodos `@Tool`. `@ToolPolicy(id = "...")` está previsto.
 - **Humano en el ciclo:** un `ApprovalGateway` intercambiable. Countersign espera hasta un plazo, deniega si nadie responde y guarda en el recibo quién aprobó.
 - **Recibos a prueba de manipulación:** JSON canónico, cadena de hashes SHA-256 y firmas Ed25519 usando solo
   `java.security`, más una utilidad de verificación que detecta cualquier recibo editado o borrado.
-- **Privacidad por defecto:** los recibos guardan un hash con clave (HMAC) de los argumentos, así que los valores no se pueden recuperar probando candidatos. Guardar los valores en crudo es opcional y pasa por un `Redactor`.
+- **Privacidad por defecto:** los recibos guardan un hash con clave (HMAC) de los argumentos, así que los valores no se pueden recuperar probando candidatos. Los valores en crudo nunca se guardan.
 - **Destinos de auditoría:** en memoria y PostgreSQL (solo inserción) incluidos.
 - **Observabilidad:** `countersign.decisions`, `countersign.evaluation` y `countersign.audit.failures` vía Micrometer,
   y la decisión y el id del recibo en el span de cada llamada a herramienta.

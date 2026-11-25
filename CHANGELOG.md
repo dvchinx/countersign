@@ -79,6 +79,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The READMEs no longer list `REDACT`, the `Redactor` or `@ToolPolicy` as available: they are planned, not
+  implemented.
 - The README, the banking-agent example and the Javadoc name tools `payments_transfer` and `db_*` instead of
   `payments.transfer` and `db.*`: OpenAI and Anthropic reject tool names with dots. Countersign still accepts any
   name.
