@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `CONTRIBUTING.md`, `SECURITY.md` (private vulnerability reporting through GitHub), issue templates and a pull
+  request template.
 - Releases to Maven Central ([ADR 0012](docs/adr/0012-releasing-to-maven-central.md)): a `release` profile that
   attaches sources and javadoc, signs with GPG and publishes through the Central Portal, and a GitHub Actions
   workflow that publishes when a `v*` tag matching the POM version is pushed. Examples are never published.

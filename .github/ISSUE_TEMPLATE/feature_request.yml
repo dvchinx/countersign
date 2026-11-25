@@ -1,0 +1,44 @@
+name: Feature request
+description: A new capability, policy feature or port implementation.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Countersign stays deterministic and fails closed. LLM-based classifiers, a UI dashboard, non-Spring
+        frameworks, A2A, multi-tenant policy management and a remote policy server are out of scope for now.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do with your agent, and what stops you today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How you would like it to work. Configuration or code sketches help.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Policies and conditions
+        - Approval (ApprovalGateway)
+        - Audit and receipts (AuditSink, ReceiptSigner)
+        - Spring AI / MCP integration
+        - Spring Boot starter and configuration
+        - Metrics and observability
+        - Docs and examples
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to implement this myself.

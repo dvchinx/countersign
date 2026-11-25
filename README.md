@@ -316,12 +316,12 @@ touching the policy engine:
 
 - **`ApprovalGateway`:** Slack, Teams, email or a web console approver
 - **`AuditSink`:** Kafka, S3, OpenSearch, or your SIEM
-- **`Redactor`:** PII masking strategies
 - **`ReceiptSigner`:** KMS / HSM-backed signing
 
-Each SPI comes with an abstract contract test in `countersign-test`. Passing it is the bar for merging.
-Architecture, conventions and testing rules are in [`CLAUDE.md`](CLAUDE.md). Issues labelled
-`good first issue` are the best place to start.
+Passing the port's contract test in `countersign-test` is the bar for merging (`AuditSinkContract` today;
+contracts for the other ports are good first contributions). Start with [`CONTRIBUTING.md`](CONTRIBUTING.md);
+issues labelled `good first issue` are the best place to begin. To report a vulnerability, see
+[`SECURITY.md`](SECURITY.md).
 
 If Countersign looks useful to you, a ⭐ helps other Spring teams find it.
 

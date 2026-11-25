@@ -323,13 +323,13 @@ tocar el motor de políticas:
 
 - **`ApprovalGateway`:** aprobaciones por Slack, Teams, correo o una consola web
 - **`AuditSink`:** Kafka, S3, OpenSearch o tu SIEM
-- **`Redactor`:** estrategias de enmascaramiento de datos personales
 - **`ReceiptSigner`:** firma respaldada por KMS / HSM
 
-Cada SPI trae un test de contrato abstracto en `countersign-test`. Pasarlo es el requisito para hacer merge.
-La arquitectura, las convenciones y las reglas de testing están en [`CLAUDE.md`](CLAUDE.md) (en inglés).
-Los issues con la etiqueta `good first issue` son el mejor punto de partida. El código, los comentarios
-y los commits se escriben en inglés, pero puedes abrir issues y discusiones en español.
+Pasar el test de contrato del puerto en `countersign-test` es el requisito para hacer merge (hoy existe
+`AuditSinkContract`; escribir los contratos de los otros puertos es una buena primera contribución). Empieza por
+[`CONTRIBUTING.md`](CONTRIBUTING.md) (en inglés); los issues con la etiqueta `good first issue` son el mejor punto
+de partida. El código, los comentarios y los commits se escriben en inglés, pero puedes abrir issues y discusiones
+en español. Para reportar una vulnerabilidad, consulta [`SECURITY.md`](SECURITY.md).
 
 Si Countersign te parece útil, una ⭐ ayuda a que otros equipos de Spring lo encuentren.
 
