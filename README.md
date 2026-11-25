@@ -14,7 +14,7 @@
   <a href="https://central.sonatype.com/artifact/io.github.dvchinx/countersign-spring-boot-starter"><img alt="Maven Central" src="https://img.shields.io/maven-central/v/io.github.dvchinx/countersign-spring-boot-starter"></a>
   <a href="https://github.com/dvchinx/countersign/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/dvchinx/countersign/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Java 21" src="https://img.shields.io/badge/java-21-blue?logo=openjdk&logoColor=white">
-  <img alt="Spring AI 2.0" src="https://img.shields.io/badge/spring%20ai-2.0.x-6DB33F?logo=spring&logoColor=white">
+  <img alt="Spring AI 2.0 and 2.1" src="https://img.shields.io/badge/spring%20ai-2.0.x%20%7C%202.1.x-6DB33F?logo=spring&logoColor=white">
   <img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue">
   <a href="https://github.com/dvchinx/countersign/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/dvchinx/countersign?style=social"></a>
 </p>
@@ -293,8 +293,11 @@ wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Build
 | `countersign-test`                | Test helpers and SPI contract tests                                |
 | `examples/banking-agent`          | Flagship demo: an agent that reads balances and moves money        |
 | `examples/mcp-server-guarded`     | Guarding tools exposed through an MCP server                       |
+| `compat/spring-ai-2.1`            | Tests on Spring AI 2.1 (tool call confirmation); not published     |
 
-**Requirements:** Java 21, Spring Boot 4.x, Spring AI 2.0.1 or later.
+**Requirements:** Java 21, Spring Boot 4.x, Spring AI 2.0.1 or later. Tested on Spring AI 2.0 and 2.1. On 2.1,
+Spring AI's tool call confirmation works with Countersign: a call a person confirms still goes through your policies,
+and a policy `deny` wins over the person's `allow`.
 
 ## Roadmap to 0.1.0
 

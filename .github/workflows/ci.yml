@@ -14,8 +14,14 @@ concurrency:
 
 jobs:
   build:
-    name: Build and test (JDK 21)
+    name: Build and test (JDK 21, Spring AI ${{ matrix.spring-ai }})
     runs-on: ubuntu-latest
+    # The baseline, and the newest line Countersign supports on top of it (ADR 0013). The baseline run also tests
+    # compat/spring-ai-2.1, which always uses 2.1.
+    strategy:
+      fail-fast: false
+      matrix:
+        spring-ai: ['2.0.2', '2.1.0']
     steps:
       - uses: actions/checkout@v7
 
@@ -27,4 +33,4 @@ jobs:
 
       # Same command contributors run locally. Docker is available on ubuntu-latest for Testcontainers.
       - name: Verify
-        run: ./mvnw --batch-mode --no-transfer-progress verify
+        run: ./mvnw --batch-mode --no-transfer-progress -Dspring-ai.version=${{ matrix.spring-ai }} verify

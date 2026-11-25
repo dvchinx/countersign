@@ -94,4 +94,87 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <!--
+        Spring AI 2.1 support without dropping 2.0 (ADR 0013). src/main/java is compiled against the baseline, like the
+        rest of the build. src/main/spring-ai-2.1 holds the few classes that need a 2.1 type; a second compiler run
+        builds them into the same output, with Spring AI 2.1's spring-ai-model ahead of the baseline one. They are only
+        loaded, by name, when the application runs on Spring AI 2.1 or later. The published POM is unchanged: users
+        keep the Spring AI version they choose.
+    -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>spring-ai-2.1-api</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.springframework.ai</groupId>
+                                    <artifactId>spring-ai-model</artifactId>
+                                    <version>${spring-ai-2.1.version}</version>
+                                    <destFileName>spring-ai-model.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                            <outputDirectory>${project.build.directory}/spring-ai-2.1</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>compile-classpath</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>build-classpath</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>compile</includeScope>
+                            <outputProperty>countersign.compile.classpath</outputProperty>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>compile-spring-ai-2.1</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <compileSourceRoots>
+                                <compileSourceRoot>${project.basedir}/src/main/spring-ai-2.1</compileSourceRoot>
+                            </compileSourceRoots>
+                            <!-- javac keeps the last class path it is given: this one replaces Maven's. -->
+                            <compilerArgs combine.children="append">
+                                <arg>-classpath</arg>
+                                <arg>${project.build.outputDirectory}${path.separator}${project.build.directory}/spring-ai-2.1/spring-ai-model.jar${path.separator}${countersign.compile.classpath}</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <configuration>
+                    <java>
+                        <includes>
+                            <include>src/main/java/**/*.java</include>
+                            <include>src/main/spring-ai-2.1/**/*.java</include>
+                            <include>src/test/java/**/*.java</include>
+                        </includes>
+                    </java>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

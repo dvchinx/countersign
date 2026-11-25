@@ -44,6 +44,9 @@ every change to a public type must be deliberate (see "Public API rules").
 - Spring AI 2.0.x, minimum 2.0.1 (tool calling + MCP support in core; 2.0.1 fixes CVE-2026-59318,
   where a tool not offered to the model could still be dispatched. That CVE is exactly why
   enforcement must happen where the tool runs, not in the tool list sent to the model)
+- Spring AI 2.1.x also supported (ADR 0013): the baseline stays 2.0.x; code that needs a 2.1 type lives in
+  `countersign-spring-ai/src/main/spring-ai-2.1`, is compiled against 2.1 in a second compiler run and is
+  loaded by name only on 2.1. `compat/spring-ai-2.1` tests it; CI runs the suite on both lines
 - MCP Java SDK 2.0.x (transitively via Spring AI)
 - Maven (multi-module, use the wrapper `./mvnw`)
 - Testing: JUnit 5, AssertJ, Mockito, ArchUnit, Testcontainers (PostgreSQL)
@@ -67,6 +70,8 @@ countersign/
 ├── countersign-spring-boot-starter/   # Auto-configuration + @ConfigurationProperties
 ├── countersign-audit-jdbc/            # AuditSink implementation (PostgreSQL, append-only)
 ├── countersign-test/                  # Test helpers for users (assert an agent was blocked, etc.)
+├── compat/
+│   └── spring-ai-2.1/              # Tests on Spring AI 2.1 (tool call confirmation). Never published
 ├── examples/
 │   ├── banking-agent/              # Flagship demo: agent that can read balances and move money
 │   └── mcp-server-guarded/         # Guarding tools exposed through an MCP server
