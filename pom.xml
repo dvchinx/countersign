@@ -321,7 +321,11 @@
                             <publishingServerId>central</publishingServerId>
                             <deploymentName>countersign ${project.version}</deploymentName>
                             <autoPublish>true</autoPublish>
-                            <waitUntil>published</waitUntil>
+                            <!--
+                                Wait for validation only: a rejected bundle still fails the build, but publishing can
+                                take over an hour and would time the build out after a successful upload.
+                            -->
+                            <waitUntil>validated</waitUntil>
                             <!-- Examples are part of the build, not of the release. -->
                             <excludeArtifacts>
                                 <artifact>countersign-examples</artifact>

@@ -42,7 +42,8 @@ jobs:
           fi
           case "${version}" in *-SNAPSHOT) echo "::error::Refusing to release a SNAPSHOT"; exit 1;; esac
 
-      # Runs the full test suite (Testcontainers included), then signs, uploads and waits until Central publishes.
+      # Runs the full test suite (Testcontainers included), then signs, uploads and waits until Central validates the
+      # bundle. Central then publishes on its own, which can take over an hour.
       - name: Deploy
         run: ./mvnw --batch-mode --no-transfer-progress -Prelease deploy
         env:

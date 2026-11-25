@@ -22,8 +22,10 @@ published. Release versions on Central are immutable: a wrong upload cannot be r
   `missing` doclint group: `@ConfigurationProperties` accessors are documented on their fields, which is where the
   configuration processor reads them.
 - The examples skip sources and javadoc and are listed in `excludeArtifacts`, so they never reach the bundle.
-- The plugin uses `autoPublish=true` and `waitUntil=published`: the build fails if the Portal rejects the bundle,
-  and succeeds only once the release is on Central.
+- The plugin uses `autoPublish=true` and `waitUntil=validated`: the build fails if the Portal rejects the bundle,
+  and succeeds once the Portal accepts it; Central then publishes on its own. (Amended after `0.1.0`: with
+  `waitUntil=published` the plugin gave up after its polling limit while Central was still publishing, so the
+  workflow failed although the release was fine. Check the release on the Portal's deployments page.)
 - Releases run from GitHub Actions (`.github/workflows/release.yml`) when a `v*` tag is pushed. The workflow refuses a
   tag that does not match the POM version and refuses SNAPSHOT versions, then runs the full test suite as part of
   `deploy`. Credentials are a Portal user token (never the account password) and a GPG key dedicated to signing
