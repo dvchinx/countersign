@@ -19,8 +19,12 @@ import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -87,6 +91,28 @@ public abstract class ReceiptSignerContract {
                         "bob"));
 
         assertThat(new ReceiptVerifier(publicKey()).verify(receipts)).isEqualTo(new VerificationResult.Valid(3));
+    }
+
+    @Test
+    void signsConcurrentlyWithSignaturesThatAllVerify() throws Exception {
+        int calls = 200;
+        List<byte[]> hashes = new ArrayList<>();
+        for (int i = 0; i < calls; i++) {
+            hashes.add(sha256("receipt-" + i));
+        }
+
+        List<Future<byte[]>> signatures = new ArrayList<>();
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (byte[] hash : hashes) {
+                signatures.add(executor.submit(() -> signer().sign(hash)));
+            }
+        }
+
+        for (int i = 0; i < calls; i++) {
+            assertThat(verifies(hashes.get(i), signatures.get(i).get()))
+                    .as("signature %d", i)
+                    .isTrue();
+        }
     }
 
     private boolean verifies(byte[] hash, byte[] signature) throws GeneralSecurityException {
