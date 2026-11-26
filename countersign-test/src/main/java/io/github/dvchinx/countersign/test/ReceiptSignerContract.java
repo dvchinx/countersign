@@ -44,6 +44,17 @@ public abstract class ReceiptSignerContract {
         assertThat(verifies(hash, signature)).isTrue();
     }
 
+    @Test
+    void signatureForOneHashDoesNotVerifyForAnother() throws Exception {
+        byte[] signedHash = sha256("receipt-1");
+        byte[] otherHash = sha256("receipt-2");
+
+        byte[] signature = signer().sign(signedHash);
+
+        assertThat(verifies(signedHash, signature)).isTrue();
+        assertThat(verifies(otherHash, signature)).isFalse();
+    }
+
     private boolean verifies(byte[] hash, byte[] signature) throws GeneralSecurityException {
         Signature verifier = Signature.getInstance("Ed25519");
         verifier.initVerify(publicKey());
