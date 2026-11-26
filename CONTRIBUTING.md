@@ -29,7 +29,7 @@ without touching the policy engine.
 |--------------------|-----------------------------------------------------------|-------------------------------------|
 | `AuditSink`        | Stores receipts: Kafka, S3, OpenSearch, a SIEM            | `AuditSinkContract`                 |
 | `ApprovalGateway`  | Asks a human to approve a call: Slack, Teams, email, a UI | Not yet: a good first contribution  |
-| `ReceiptSigner`    | Signs receipt hashes: KMS, HSM, Vault                     | Not yet: a good first contribution  |
+| `ReceiptSigner`    | Signs receipt hashes: KMS, HSM, Vault                     | `ReceiptSignerContract`             |
 | `Redactor`         | Masks data in tool calls: national ids, cards, IBANs      | `RedactorContract`                  |
 | `DecisionListener` | Observes every decision: metrics, alerts, logs            | Not needed (it cannot change a decision) |
 
