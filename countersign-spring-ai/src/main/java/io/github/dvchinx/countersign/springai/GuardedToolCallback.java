@@ -30,8 +30,10 @@ import org.springframework.ai.tool.metadata.ToolMetadata;
  * <ol>
  *   <li>parses the input strictly (see {@code ToolInputParser}); unreadable input is refused;
  *   <li>runs {@link ToolCallGuard#check}, which evaluates the policies and records a signed receipt;
- *   <li>runs the wrapped tool only on {@link Verdict.Proceed}, passing it the original input and context unchanged;
- *   <li>passes the tool's result through the redaction rules that apply to the call, if any (ADR 0015).
+ *   <li>runs the wrapped tool only on {@link Verdict.Proceed}, with the context unchanged and the original input,
+ *       byte for byte, unless a redaction rule changed the arguments: then the tool gets the redacted arguments as
+ *       compact JSON (ADR 0015);
+ *   <li>passes the tool's result through the redaction rules that apply to the call, if any.
  * </ol>
  *
  * <p>A refusal is returned to the model as a small JSON object it can explain to the user, for example
@@ -136,8 +138,23 @@ public final class GuardedToolCallback implements ToolCallback {
             return refusal(toolName, invocationId, Decision.Type.DENY, UNEXPECTED_FAILURE);
         }
         return switch (verdict) {
-            case Verdict.Proceed proceed ->
-                redact(toolName, invocationId, proceed.resultRedaction(), delegate.call(toolInput, toolContext));
+            case Verdict.Proceed proceed -> {
+                String input;
+                try {
+                    input = proceed.redactedArguments() == null
+                            ? toolInput
+                            : CoreJson.write(proceed.redactedArguments());
+                } catch (RuntimeException e) {
+                    // The tool must never run with arguments that were meant to be redacted and were not.
+                    LOG.error(
+                            "Countersign could not write the redacted arguments of tool '{}' ({}); refusing the call",
+                            toolName,
+                            e.getClass().getName());
+                    LOG.debug("Countersign failure details", e);
+                    yield refusal(toolName, invocationId, Decision.Type.DENY, UNEXPECTED_FAILURE);
+                }
+                yield redact(toolName, invocationId, proceed.resultRedaction(), delegate.call(input, toolContext));
+            }
             case Verdict.Refuse refuse -> refusal(toolName, invocationId, refuse.decision(), refuse.reason());
         };
     }

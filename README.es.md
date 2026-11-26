@@ -96,15 +96,15 @@ Al arrancar verás una línea en el log que indica que Countersign está activo 
 
 <p align="center">
   <img src="docs/images/tool-call-flow.drawio.svg" width="860"
-       alt="Flujo de una llamada: el agente propone la llamada, GuardedToolCallback consulta al PolicyEngine, que devuelve ALLOW, REQUIRE APPROVAL o DENY. Cada decisión, con la respuesta del humano cuando hacía falta aprobación, genera un recibo firmado antes de que la herramienta se ejecute, que va al AuditSink y a Micrometer. Las llamadas permitidas o aprobadas ejecutan la herramienta, y su resultado pasa por cada regla de redacción que coincida; las denegadas, rechazadas o vencidas reciben un rechazo estructurado. Cualquiera de los dos vuelve al modelo. Una nota aclara que la redacción no es una decisión: toda regla que coincide se aplica a cada llamada que se ejecuta, también a las aprobadas.">
+       alt="Flujo de una llamada: el agente propone la llamada, GuardedToolCallback consulta al PolicyEngine, que devuelve ALLOW, REQUIRE APPROVAL o DENY. Cada decisión, con la respuesta del humano cuando hacía falta aprobación, genera un recibo firmado antes de que la herramienta se ejecute, que va al AuditSink y a Micrometer. Las llamadas permitidas o aprobadas pasan sus argumentos por cada regla de redacción que coincida, ejecutan la herramienta y pasan su resultado por cada regla que coincida; las denegadas, rechazadas o vencidas reciben un rechazo estructurado. Cualquiera de los dos vuelve al modelo. Una nota aclara que la redacción no es una decisión: toda regla que coincide se aplica a cada llamada que se ejecuta, también a las aprobadas.">
 </p>
 
 1. **Construye** un `ToolInvocation`: nombre de la herramienta, argumentos parseados, principal e id de conversación.
 2. **Evalúa** la invocación contra tus políticas, en orden de prioridad. Gana la primera que coincide; si ninguna coincide, se aplica la decisión por defecto (`deny`). Con `REQUIRE_APPROVAL`, espera a un humano hasta que venza el plazo.
 3. **Registra** un recibo: la decisión, las políticas que coincidieron, quién la aprobó, las reglas de redacción que se aplican, un hash con clave (HMAC-SHA256) de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
 4. **Publica** el recibo en tu `AuditSink`, junto con métricas y observaciones de Micrometer.
-5. **Aplica** la decisión: ejecuta la herramienta si se permitió o se aprobó, y pasa su resultado por cada regla de
-   redacción que coincida antes de que el modelo lo vea; si no, devuelve un rechazo estructurado.
+5. **Aplica** la decisión: ejecuta la herramienta si se permitió o se aprobó, pasando sus argumentos y su resultado
+   por cada regla de redacción que coincida; si no, devuelve un rechazo estructurado.
 
 El recibo se firma antes de que la herramienta se ejecute: si la firma falla, la herramienta no corre.
 
@@ -131,9 +131,9 @@ filtro de contenido, no en lugar de uno.
 ## Funcionalidades
 
 - **Tres decisiones:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`.
-- **Redacción de resultados:** enmascara números de tarjeta, correos o cualquier campo antes de que el resultado de una
-  herramienta llegue al modelo. Se aplica toda regla que coincida, también en llamadas aprobadas
-  ([ADR 0015](docs/adr/0015-redaction.md)). La redacción de argumentos está prevista.
+- **Redacción:** enmascara números de tarjeta, correos o cualquier campo en el resultado de una herramienta antes de
+  que llegue al modelo, o en sus argumentos antes de que lleguen a la herramienta. Se aplica toda regla que coincida,
+  también en llamadas aprobadas ([ADR 0015](docs/adr/0015-redaction.md)).
 - **Políticas declarativas:** globs de herramientas (`db_*`), prioridades y condiciones escritas en un
   SpEL aislado (`SimpleEvaluationContext`: sin referencias a tipos, sin acceso a beans, sin llamadas a métodos arbitrarios).
 - **Anotaciones:** `@RequiresApproval` en tus métodos `@Tool`. `@ToolPolicy(id = "...")` está previsto.
@@ -194,7 +194,7 @@ Todas las propiedades viven bajo `countersign.*`. Para empezar solo necesitas `p
 | `countersign.redactions[n].id` | | Id único (compartido con los ids de políticas), guardado en los recibos. |
 | `countersign.redactions[n].tools` | | Globs de nombres de herramienta. |
 | `countersign.redactions[n].when` | siempre | SpEL aislado sobre los argumentos, como en las políticas. |
-| `countersign.redactions[n].target` | | `result`. |
+| `countersign.redactions[n].target` | | `args` (lo que recibe la herramienta), `result` (lo que recibe el modelo), o `args, result`. |
 | `countersign.redactions[n].redactors` | | Redactores que se aplican, en orden: claves de `countersign.redactors` o nombres de beans `Redactor`. |
 | `countersign.receipts.signing-key` | generada | Clave privada Ed25519, PKCS#8, Base64. |
 | `countersign.receipts.args-hmac-key` | generada | 32 o más bytes aleatorios, Base64, para el hash con clave de los argumentos. |
@@ -297,10 +297,11 @@ approvals.reject(invocationId, currentUser(), "Beneficiario desconocido");
 La petición del agente espera mientras la aprobación está pendiente, así que el plazo debe ser menor que cualquier
 timeout HTTP que haya delante.
 
-**Redactar resultados.** Una llamada puede estar permitida y aun así devolver datos que el modelo no debe ver, como un
-número de tarjeta o el correo de un cliente. Una regla de redacción cambia el resultado antes de que llegue al modelo.
-A diferencia de las políticas, se aplica toda regla que coincida con una llamada que se ejecuta, sea cual sea la
-decisión de acceso: una llamada aprobada también se redacta, y ningún `allow` anterior puede saltarse una regla.
+**Redacción.** Una llamada puede estar permitida y aun así llevar datos que no deben ir a donde van. Una regla de
+redacción cambia el **resultado** antes de que llegue al modelo, como un número de tarjeta que devuelve un CRM, o los
+**argumentos** antes de que lleguen a la herramienta, como el correo de un cliente enviado a un buscador externo. A
+diferencia de las políticas, se aplica toda regla que coincida con una llamada que se ejecuta, sea cual sea la decisión
+de acceso: una llamada aprobada también se redacta, y ningún `allow` anterior puede saltarse una regla.
 
 ```yaml
 countersign:
@@ -308,29 +309,47 @@ countersign:
     - id: crm-reads
       tools: ["crm_*"]
       decision: allow
+    - id: searches
+      tools: ["web_search"]
+      decision: allow
   redactors:
     card-number:
       pattern: "\\b\\d(?:[ -]?\\d){12,18}\\b"   # en textos, y en números cuyos dígitos coinciden
       replacement: "[CARD]"
+    email:
+      pattern: "[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+"
+      replacement: "[EMAIL]"
     contact:
       fields: [email, phone]                    # el valor bajo estas claves, a cualquier profundidad
   redactions:
     - id: no-cards-to-the-model
       tools: ["crm_*"]
-      target: result
+      target: result                            # args, result, o ambos: "args, result"
       redactors: [card-number, contact]
+    - id: no-emails-to-search
+      tools: ["web_search"]
+      target: args
+      redactors: [email]
 ```
 
-El modelo recibe `{"name":"Ana Pérez","email":"[REDACTED]","phone":"[REDACTED]","card":"[CARD]"}`, y el recibo
-guarda `"redactions": ["no-cards-to-the-model"]`. Un resultado JSON se redacta como árbol, así que `fields` ve sus
-claves; cualquier otro texto se redacta como una sola cadena. Para reglas propias, define un bean `Redactor` y
-nómbralo en `redactors`; `Redactor.strings(text -> ...)` es la forma más corta de escribir uno. Mantén los patrones
-simples: se ejecutan sobre datos que controla el modelo, y la llamada los espera.
+De `crm_find_customer`, el modelo recibe `{"name":"Ana Pérez","email":"[REDACTED]","phone":"[REDACTED]","card":"[CARD]"}`.
+Cuando el modelo le pide a `web_search` `orders of ana@example.com`, la herramienta recibe `orders of [EMAIL]`. Cada
+recibo guarda las reglas que se aplicaron, como `"redactions": ["no-cards-to-the-model"]`. Para reglas propias, define
+un bean `Redactor` y nómbralo en `redactors`; `Redactor.strings(text -> ...)` es la forma más corta de escribir uno.
+Mantén los patrones simples: se ejecutan sobre datos que controla el modelo, y la llamada los espera.
 
-Si un redactor falla, la herramienta ya se ejecutó, así que su resultado se retiene: el modelo recibe
-`"status":"WITHHELD"`, y `countersign.audit.failures` lo cuenta con `stage=redaction`. La redacción solo controla lo
-que ve el modelo; cuando una herramienta no debe ejecutarse en absoluto, usa `deny` o `require-approval`. La redacción
-de argumentos está prevista; por ahora `target: args` detiene la aplicación al arrancar.
+Los *argumentos* se redactan antes de pedirle a nadie que apruebe la llamada. Las políticas, el aprobador y el hash de
+argumentos del recibo conservan lo que propuso el modelo, y los redactores son deterministas, así que quien tenga los
+argumentos originales puede recalcular lo que recibió la herramienta. La herramienta recibe los argumentos redactados
+como JSON compacto, o la entrada del modelo sin cambios cuando ninguna regla cambió nada. Si un redactor de argumentos
+falla, la llamada se rechaza y se registra, y la herramienta nunca se ejecuta. Comprueba que la herramienta siga
+aceptando lo que recibe: un número reemplazado por `[REDACTED]` pasa a ser un texto.
+
+Los *resultados* que son JSON se redactan como árbol, así que `fields` ve sus claves; cualquier otro texto se redacta
+como una sola cadena. Si un redactor de resultados falla, la herramienta ya se ejecutó, así que su resultado se retiene:
+el modelo recibe `"status":"WITHHELD"`, y `countersign.audit.failures` lo cuenta con `stage=redaction`. La redacción
+solo controla por dónde pasan los datos; cuando una herramienta no debe ejecutarse en absoluto, usa `deny` o
+`require-approval`.
 
 **En nombre de quién actúa el agente.** Cada recibo guarda el principal, y las políticas pueden usarlo
 (`#principal == 'alice'`). Si la aplicación usa Spring Security, es el usuario autenticado, sin escribir código; los

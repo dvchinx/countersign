@@ -94,20 +94,21 @@ Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)               
                           │     conversation id). Unreadable input → refused and recorded.
                           └─ ToolCallGuard.check(invocation) ──► Verdict           (countersign-core)
                                ├─ 2. PolicyEngine.evaluate(invocation) ──► EvaluationResult
-                               ├─ 3. Not denied: find every matching redaction rule (before approval, so
-                               │     nobody approves a call that is refused anyway); a rule condition that
-                               │     throws → refuse and record as EVALUATION_FAILED (ADR 0015)
+                               ├─ 3. Not denied: find every matching redaction rule and run the ARGS
+                               │     redactors (before approval, so nobody approves a call that is refused
+                               │     anyway); a rule that throws → refuse and record as EVALUATION_FAILED
+                               │     (ADR 0015). Policies, approver and argsHmac keep the proposed args
                                ├─ 4. REQUIRE_APPROVAL only: ApprovalGateway, wait up to the timeout;
                                │     rejected / timed out / no gateway / error → refuse (ADR 0008)
                                ├─ 5. ReceiptChain.append ──► signed Receipt, with approval outcome,
                                │     approver and applied redactions (before the tool runs)
                                ├─ 6. AuditSink.append(receipt) + Micrometer observation
                                └─ 7. Apply decision:
-                                      ALLOW / approved → delegate to the real ToolCallback; RESULT
-                                                         redactors run on its result (failure →
-                                                         result withheld, stage=redaction metric).
-                                                         ARGS redaction is not implemented yet:
-                                                         target args is rejected at startup
+                                      ALLOW / approved → delegate to the real ToolCallback with the
+                                                         redacted args (or the original input, unchanged,
+                                                         when no rule changed them); RESULT redactors run
+                                                         on its result (failure → result withheld,
+                                                         stage=redaction metric)
                                       DENY / not approved → structured refusal (no exception leak)
 ```
 
@@ -117,7 +118,7 @@ Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)               
 - `Decision` (sealed interface): `Allow`, `Deny(reason)`, `RequireApproval(reason)`. Redaction is not a
   decision: it is an obligation on calls that run (ADR 0015).
 - `Policy`: id, target tools (glob), condition, decision, priority.
-- `RedactionRule`: id, target tools (glob), condition, target (result; args planned), redactors. Every
+- `RedactionRule`: id, target tools (glob), condition, target (args / result / both), redactors. Every
   matching rule applies; order between rules and policies cannot drop one (ADR 0015).
 - `PolicyEngine`: evaluates policies in priority order; first match wins; if nothing matches,
   applies the configured default (`deny` by default).
