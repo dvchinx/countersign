@@ -30,9 +30,11 @@ without touching the policy engine.
 | `AuditSink`        | Stores receipts: Kafka, S3, OpenSearch, a SIEM            | `AuditSinkContract`                 |
 | `ApprovalGateway`  | Asks a human to approve a call: Slack, Teams, email, a UI | Not yet: a good first contribution  |
 | `ReceiptSigner`    | Signs receipt hashes: KMS, HSM, Vault                     | Not yet: a good first contribution  |
+| `Redactor`         | Masks data in tool calls: national ids, cards, IBANs      | `RedactorContract`                  |
 | `DecisionListener` | Observes every decision: metrics, alerts, logs            | Not needed (it cannot change a decision) |
 
-Redaction (`Redactor` and the `REDACT` decision) is planned but not implemented yet.
+Redaction is not a decision but an obligation on calls that run: every matching redaction rule applies, whatever
+decided access ([ADR 0015](docs/adr/0015-redaction.md)).
 
 - **New implementations** live in their own module (`countersign-approval-slack`, `countersign-audit-kafka`, ...).
   Open an issue first so we can agree on the module and its dependencies before you write it.

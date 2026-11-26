@@ -423,11 +423,13 @@ tocar el motor de políticas:
 - **`ApprovalGateway`:** aprobaciones por Slack, Teams, correo o una consola web
 - **`AuditSink`:** Kafka, S3, OpenSearch o tu SIEM
 - **`ReceiptSigner`:** firma respaldada por KMS / HSM
+- **`Redactor`:** detectores de documentos de identidad, IBAN o secretos en las llamadas a herramientas
 - **`PrincipalResolver`:** en nombre de quién actúa el agente, desde una cabecera del gateway, un JWT o la identidad
   de un cliente MCP
 
-Pasar el test de contrato del puerto en `countersign-test` es el requisito para hacer merge (hoy existe
-`AuditSinkContract`; escribir los contratos de los otros puertos es una buena primera contribución). Empieza por
+Pasar el test de contrato del puerto en `countersign-test` es el requisito para hacer merge (hoy existen
+`AuditSinkContract` y `RedactorContract`; escribir los contratos de los otros puertos es una buena primera
+contribución). Empieza por
 [`CONTRIBUTING.md`](CONTRIBUTING.md) (en inglés); los issues con la etiqueta `good first issue` son el mejor punto
 de partida. El código, los comentarios y los commits se escriben en inglés, pero puedes abrir issues y discusiones
 en español. Para reportar una vulnerabilidad, consulta [`SECURITY.md`](SECURITY.md).
