@@ -398,9 +398,9 @@ touching the policy engine:
 - **`PrincipalResolver`:** who the agent acts for, from a gateway header, a JWT or an MCP client's identity
 
 Passing the port's contract test in `countersign-test` is the bar for merging (`AuditSinkContract` and
-`RedactorContract` today; contracts for the other ports are good first contributions). Start with [`CONTRIBUTING.md`](CONTRIBUTING.md);
-issues labelled `good first issue` are the best place to begin. To report a vulnerability, see
-[`SECURITY.md`](SECURITY.md).
+`RedactorContract` today; contracts for the other ports are good first contributions). Start with
+[`CONTRIBUTING.md`](CONTRIBUTING.md); issues labelled `good first issue` are the best place to begin. To report a
+vulnerability, see [`SECURITY.md`](SECURITY.md).
 
 If Countersign looks useful to you, a ⭐ helps other Spring teams find it.
 
