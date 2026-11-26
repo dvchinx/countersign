@@ -33,7 +33,22 @@ import org.junit.jupiter.api.Test;
  *
  * <p>
  * Extend this class in your signer's test suite and implement {@link #signer()}
- * and {@link #publicKey()}.
+ * and {@link #publicKey()}. The contract checks that:
+ *
+ * <ol>
+ * <li>the signature of a receipt hash is not empty and verifies with the public
+ * key;
+ * <li>a signature is bound to its hash and does not verify for another one;
+ * <li>a chain built with {@link ReceiptChain} passes {@link ReceiptVerifier},
+ * so receipts from the signer can be audited;
+ * <li>concurrent calls on virtual threads all return valid signatures, because
+ * the port must be thread-safe.
+ * </ol>
+ *
+ * <p>
+ * Signatures are checked with the JDK's Ed25519 implementation and the key from
+ * {@link #publicKey()}, the same check an auditor runs later. A signer backed
+ * by a KMS or an HSM passes as long as it returns raw Ed25519 signatures.
  */
 public abstract class ReceiptSignerContract {
 
@@ -54,6 +69,11 @@ public abstract class ReceiptSignerContract {
      */
     protected abstract PublicKey publicKey();
 
+    /**
+     * A signer must return a real signature for the receipt's hash. An empty or
+     * made-up signature would leave a receipt that nobody can verify, and the audit
+     * trail would be worthless.
+     */
     @Test
     void signsAHashSoThatItVerifiesWithThePublicKey() throws Exception {
         byte[] hash = sha256("receipt-1");
@@ -64,6 +84,12 @@ public abstract class ReceiptSignerContract {
         assertThat(verifies(hash, signature)).isTrue();
     }
 
+    /**
+     * A signature must belong to the hash it was made for. If it also verified for
+     * another hash, it could be copied onto an edited receipt. The signature is
+     * checked against its own hash first, so a signer that returns garbage cannot
+     * pass by accident.
+     */
     @Test
     void signatureForOneHashDoesNotVerifyForAnother() throws Exception {
         byte[] signedHash = sha256("receipt-1");
@@ -75,6 +101,13 @@ public abstract class ReceiptSignerContract {
         assertThat(verifies(otherHash, signature)).isFalse();
     }
 
+    /**
+     * Receipts are signed by {@link ReceiptChain} and checked by
+     * {@link ReceiptVerifier}, not by hand. A signer whose output the verifier
+     * rejects, for example because it returns an encoded signature instead of raw
+     * bytes, would make every receipt fail the audit. The chain mixes allowed,
+     * denied and approved calls, so every kind of receipt is covered.
+     */
     @Test
     void signsAChainThatReceiptVerifierAccepts() {
         ReceiptChain chain = newChain();
@@ -93,6 +126,14 @@ public abstract class ReceiptSignerContract {
         assertThat(new ReceiptVerifier(publicKey()).verify(receipts)).isEqualTo(new VerificationResult.Valid(3));
     }
 
+    /**
+     * Many tool calls are guarded at once through the same signer, so the port must
+     * be thread-safe. A signer that shares one {@link Signature} between calls can
+     * mix up hashes and still pass the tests above, which make one call at a time.
+     * Every hash here is different, so a signature returned for the wrong call is
+     * caught. Results are checked on the test thread, because a failed assertion
+     * inside a task would not fail the test.
+     */
     @Test
     void signsConcurrentlyWithSignaturesThatAllVerify() throws Exception {
         int calls = 200;
