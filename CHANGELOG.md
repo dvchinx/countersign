@@ -52,6 +52,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   A resolver that throws refuses the call (fail closed), and the first call recorded without a principal logs a
   warning. The startup line says where the principal comes from.
 
+- `ReceiptSignerContract` in `countersign-test`: the tests every `ReceiptSigner` must pass. It checks that a
+  signature verifies with the public key, does not verify for another hash, passes `ReceiptVerifier` in a chain and
+  stays valid under 200 concurrent calls on virtual threads. `Ed25519ReceiptSigner` passes it.
+
 ### Fixed
 
 - On Spring AI 2.1, a reply paused for tool call confirmation can be resumed while Countersign is active
