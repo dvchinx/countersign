@@ -2,6 +2,8 @@ package io.github.dvchinx.countersign.springai.micrometer;
 
 import io.github.dvchinx.countersign.core.model.DecisionEvent;
 import io.github.dvchinx.countersign.core.model.EvaluationResult;
+import io.github.dvchinx.countersign.core.model.Receipt;
+import io.github.dvchinx.countersign.core.model.Redaction;
 import io.github.dvchinx.countersign.core.spi.DecisionListener;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Meter;
@@ -20,12 +22,16 @@ import java.util.Objects;
  *   <li>{@value #EVALUATION} (timer): time spent evaluating policies, tagged {@code tool}. Excludes waiting for a
  *       human, signing and auditing; calls whose arguments could not be read are not timed.
  *   <li>{@value #AUDIT_FAILURES} (counter): receipts that could not be created ({@code stage=receipt}) or stored
- *       ({@code stage=sink}), tagged {@code tool}. Without strict auditing a stored-receipt failure lets the call go
- *       on, so this counter is how it gets noticed.
+ *       ({@code stage=sink}), and results withheld because they could not be redacted ({@code stage=redaction}),
+ *       tagged {@code tool}. Without strict auditing a stored-receipt failure lets the call go on, so this counter is
+ *       how it gets noticed.
+ *   <li>{@value #REDACTIONS} (counter): one per redaction rule and target applied to a call that runs, tagged
+ *       {@code tool}, {@code rule} and {@code target} ({@code result}). Counted when the call is decided, before the
+ *       tool runs; it says that a rule applied, not that its redactors found something to change.
  * </ul>
  *
- * <p>Tag values are bounded: tools are the registered ones, policies come from configuration, and everything else is
- * an enum. Values are lowercase with dashes, as in the YAML ({@code require-approval}); {@code none} stands for no
+ * <p>Tag values are bounded: tools are the registered ones, policies and redaction rules come from configuration, and
+ * everything else is an enum. Values are lowercase with dashes, as in the YAML ({@code require-approval}); {@code none} stands for no
  * policy or no approval. Thread-safe.
  */
 public final class MicrometerDecisionListener implements DecisionListener {
@@ -39,11 +45,15 @@ public final class MicrometerDecisionListener implements DecisionListener {
     /** The audit failures counter. */
     public static final String AUDIT_FAILURES = "countersign.audit.failures";
 
+    /** The redactions counter. */
+    public static final String REDACTIONS = "countersign.redactions";
+
     private static final String NONE = "none";
 
     private final Meter.MeterProvider<Counter> decisions;
     private final Meter.MeterProvider<Timer> evaluation;
     private final Meter.MeterProvider<Counter> auditFailures;
+    private final Meter.MeterProvider<Counter> redactions;
 
     /**
      * Creates a listener that registers its meters on first use.
@@ -59,7 +69,10 @@ public final class MicrometerDecisionListener implements DecisionListener {
                 .description("Time spent evaluating Countersign policies for one tool call")
                 .withRegistry(registry);
         this.auditFailures = Counter.builder(AUDIT_FAILURES)
-                .description("Countersign receipts that could not be created or stored")
+                .description("Countersign receipts that could not be created or stored, and results withheld")
+                .withRegistry(registry);
+        this.redactions = Counter.builder(REDACTIONS)
+                .description("Countersign redaction rules applied to tool calls")
                 .withRegistry(registry);
     }
 
@@ -88,6 +101,18 @@ public final class MicrometerDecisionListener implements DecisionListener {
         } else if (event.auditFailed()) {
             auditFailures.withTags("tool", event.tool(), "stage", "sink").increment();
         }
+        for (Redaction redaction : event.redactions()) {
+            for (Redaction.Target target : redaction.targets()) {
+                redactions
+                        .withTags("tool", event.tool(), "rule", redaction.ruleId(), "target", tag(target))
+                        .increment();
+            }
+        }
+    }
+
+    @Override
+    public void onResultWithheld(Receipt receipt, String ruleId) {
+        auditFailures.withTags("tool", receipt.tool(), "stage", "redaction").increment();
     }
 
     /** {@code REQUIRE_APPROVAL} becomes {@code require-approval}, as written in the configuration. */

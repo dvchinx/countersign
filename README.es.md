@@ -102,7 +102,8 @@ Al arrancar verás una línea en el log que indica que Countersign está activo 
 1. **Construye** un `ToolInvocation`: nombre de la herramienta, argumentos parseados, principal e id de conversación.
 2. **Evalúa** la invocación contra tus políticas, en orden de prioridad. Gana la primera que coincide; si ninguna coincide, se aplica la decisión por defecto (`deny`). Con `REQUIRE_APPROVAL`, espera a un humano hasta que venza el plazo.
 3. **Registra** un recibo: la decisión, las políticas que coincidieron, quién la aprobó, un hash con clave (HMAC-SHA256) de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
-4. **Aplica** la decisión: ejecuta la herramienta si se permitió o se aprobó; si no, devuelve un rechazo estructurado.
+4. **Aplica** la decisión: ejecuta la herramienta si se permitió o se aprobó, y pasa su resultado por cada regla de
+   redacción que coincida antes de que el modelo lo vea; si no, devuelve un rechazo estructurado.
 
 El recibo se firma antes de que la herramienta se ejecute: si la firma falla, la herramienta no corre.
 5. **Publica** el recibo en tu `AuditSink`, junto con métricas y observaciones de Micrometer.
@@ -129,8 +130,10 @@ filtro de contenido, no en lugar de uno.
 
 ## Funcionalidades
 
-- **Tres decisiones:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`. La redacción de argumentos y resultados está
-  prevista ([ADR 0015](docs/adr/0015-redaction.md)).
+- **Tres decisiones:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`.
+- **Redacción de resultados:** enmascara números de tarjeta, correos o cualquier campo antes de que el resultado de una
+  herramienta llegue al modelo. Se aplica toda regla que coincida, también en llamadas aprobadas
+  ([ADR 0015](docs/adr/0015-redaction.md)). La redacción de argumentos está prevista.
 - **Políticas declarativas:** globs de herramientas (`db_*`), prioridades y condiciones escritas en un
   SpEL aislado (`SimpleEvaluationContext`: sin referencias a tipos, sin acceso a beans, sin llamadas a métodos arbitrarios).
 - **Anotaciones:** `@RequiresApproval` en tus métodos `@Tool`. `@ToolPolicy(id = "...")` está previsto.
@@ -141,7 +144,8 @@ filtro de contenido, no en lugar de uno.
   `java.security`, más una utilidad de verificación que detecta cualquier recibo editado o borrado.
 - **Privacidad por defecto:** los recibos guardan un hash con clave (HMAC) de los argumentos, así que los valores no se pueden recuperar probando candidatos. Los valores en crudo nunca se guardan.
 - **Destinos de auditoría:** en memoria y PostgreSQL (solo inserción) incluidos.
-- **Observabilidad:** `countersign.decisions`, `countersign.evaluation` y `countersign.audit.failures` vía Micrometer,
+- **Observabilidad:** `countersign.decisions`, `countersign.evaluation`, `countersign.redactions` y
+  `countersign.audit.failures` vía Micrometer,
   y la decisión y el id del recibo en el span de cada llamada a herramienta.
 - **Utilidades de test:** `countersign-test` te permite comprobar en tus propios tests que tu agente fue bloqueado.
 
@@ -184,6 +188,14 @@ Todas las propiedades viven bajo `countersign.*`. Para empezar solo necesitas `p
 | `countersign.policies[n].decision` | | `allow`, `deny` o `require-approval`. |
 | `countersign.policies[n].reason` | genérico | Se muestra al modelo (deny) o a quien aprueba (require-approval). |
 | `countersign.policies[n].priority` | `0` | El número más bajo se evalúa primero; los empates respetan el orden de la lista. |
+| `countersign.redactors.<nombre>.pattern` | | Expresión regular que se reemplaza en los valores de texto, y en los números cuyos dígitos coinciden. |
+| `countersign.redactors.<nombre>.fields` | | Claves cuyo valor se reemplaza, a cualquier profundidad, sin distinguir mayúsculas. Usa `pattern` o `fields`. |
+| `countersign.redactors.<nombre>.replacement` | `[REDACTED]` | Texto literal de reemplazo. |
+| `countersign.redactions[n].id` | | Id único (compartido con los ids de políticas), guardado en los recibos. |
+| `countersign.redactions[n].tools` | | Globs de nombres de herramienta. |
+| `countersign.redactions[n].when` | siempre | SpEL aislado sobre los argumentos, como en las políticas. |
+| `countersign.redactions[n].target` | | `result`. |
+| `countersign.redactions[n].redactors` | | Redactores que se aplican, en orden: claves de `countersign.redactors` o nombres de beans `Redactor`. |
 | `countersign.receipts.signing-key` | generada | Clave privada Ed25519, PKCS#8, Base64. |
 | `countersign.receipts.args-hmac-key` | generada | 32 o más bytes aleatorios, Base64, para el hash con clave de los argumentos. |
 | `countersign.receipts.stream-id` | nombre de la app + aleatorio | Id de la cadena de recibos de esta instancia. |
@@ -193,8 +205,8 @@ Todas las propiedades viven bajo `countersign.*`. Para empezar solo necesitas `p
 | `countersign.approval.timeout` | `2m` | Cuánto espera una llamada la respuesta de una persona antes de denegarse. |
 | `countersign.annotation-packages` | | Paquetes extra donde buscar `@RequiresApproval`; los paquetes de tu aplicación se escanean siempre. |
 
-Una política rota (sin herramientas, SpEL inválido, id duplicado) detiene la aplicación al arrancar con un mensaje
-que nombra la propiedad. Una errata nunca deja una herramienta sin proteger en silencio.
+Una política o regla de redacción rota (sin herramientas, SpEL inválido, id duplicado, redactor desconocido, patrón
+inválido) detiene la aplicación al arrancar con un mensaje que nombra la propiedad. Una errata nunca deja una herramienta sin proteger en silencio.
 
 **Nombres de herramientas.** OpenAI y Anthropic solo aceptan nombres de herramienta con letras, dígitos, `_` y `-`
 (hasta 64 caracteres), así que llama a una herramienta `payments_transfer`, no `payments.transfer`. Countersign acepta
@@ -229,6 +241,13 @@ automáticamente, y la tabla `countersign_receipt` se crea al arrancar si no exi
 
 La tabla solo acepta inserciones: unos triggers rechazan `UPDATE`, `DELETE` y `TRUNCATE`. Si gestionas el esquema
 con Flyway o Liquibase, copia `schema-postgresql.sql` del jar y pon `countersign.audit.jdbc.initialize-schema=false`.
+Al actualizar desde 0.1.0 se añade una columna `redactions`: con `initialize-schema=true` se añade al arrancar; si no,
+añade antes esta migración, o fallará cada inserción:
+
+```sql
+ALTER TABLE countersign_receipt ADD COLUMN IF NOT EXISTS redactions text[] NOT NULL DEFAULT '{}';
+```
+
 Para comprobar un stream más tarde:
 
 ```java
@@ -245,7 +264,8 @@ igual, y los beans `Policy` se suman a las políticas configuradas.
 |---|---|---|
 | `countersign.decisions` | `tool`, `decision`, `policy`, `basis`, `outcome`, `approval` | Alertar con `outcome=refuse`; ver aprobaciones que vencen. |
 | `countersign.evaluation` | `tool` | Vigilar el tiempo de evaluación de políticas (no incluye la espera de una persona). |
-| `countersign.audit.failures` | `tool`, `stage` | Detectar recibos que no se firmaron (`receipt`) o no se guardaron (`sink`). |
+| `countersign.redactions` | `tool`, `rule`, `target` | Ver qué reglas de redacción se aplican a qué herramientas. |
+| `countersign.audit.failures` | `tool`, `stage` | Detectar recibos que no se firmaron (`receipt`) o no se guardaron (`sink`), y resultados retenidos porque no se pudieron redactar (`redaction`). |
 
 Las trazas muestran `countersign.decision`, `countersign.outcome`, `countersign.policy` y `countersign.receipt` en el
 span `spring.ai.tool` de Spring AI. Para reaccionar tú a las decisiones, define un bean `DecisionListener`: recibe
@@ -276,6 +296,41 @@ approvals.reject(invocationId, currentUser(), "Beneficiario desconocido");
 
 La petición del agente espera mientras la aprobación está pendiente, así que el plazo debe ser menor que cualquier
 timeout HTTP que haya delante.
+
+**Redactar resultados.** Una llamada puede estar permitida y aun así devolver datos que el modelo no debe ver, como un
+número de tarjeta o el correo de un cliente. Una regla de redacción cambia el resultado antes de que llegue al modelo.
+A diferencia de las políticas, se aplica toda regla que coincida con una llamada que se ejecuta, sea cual sea la
+decisión de acceso: una llamada aprobada también se redacta, y ningún `allow` anterior puede saltarse una regla.
+
+```yaml
+countersign:
+  policies:
+    - id: crm-reads
+      tools: ["crm_*"]
+      decision: allow
+  redactors:
+    card-number:
+      pattern: "\\b\\d(?:[ -]?\\d){12,18}\\b"   # en textos, y en números cuyos dígitos coinciden
+      replacement: "[CARD]"
+    contact:
+      fields: [email, phone]                    # el valor bajo estas claves, a cualquier profundidad
+  redactions:
+    - id: no-cards-to-the-model
+      tools: ["crm_*"]
+      target: result
+      redactors: [card-number, contact]
+```
+
+El modelo recibe `{"name":"Ana Pérez","email":"[REDACTED]","phone":"[REDACTED]","card":"[CARD]"}`, y el recibo
+guarda `"redactions": ["no-cards-to-the-model"]`. Un resultado JSON se redacta como árbol, así que `fields` ve sus
+claves; cualquier otro texto se redacta como una sola cadena. Para reglas propias, define un bean `Redactor` y
+nómbralo en `redactors`; `Redactor.strings(text -> ...)` es la forma más corta de escribir uno. Mantén los patrones
+simples: se ejecutan sobre datos que controla el modelo, y la llamada los espera.
+
+Si un redactor falla, la herramienta ya se ejecutó, así que su resultado se retiene: el modelo recibe
+`"status":"WITHHELD"`, y `countersign.audit.failures` lo cuenta con `stage=redaction`. La redacción solo controla lo
+que ve el modelo; cuando una herramienta no debe ejecutarse en absoluto, usa `deny` o `require-approval`. La redacción
+de argumentos está prevista; por ahora `target: args` detiene la aplicación al arrancar.
 
 **En nombre de quién actúa el agente.** Cada recibo guarda el principal, y las políticas pueden usarlo
 (`#principal == 'alice'`). Si la aplicación usa Spring Security, es el usuario autenticado, sin escribir código; los

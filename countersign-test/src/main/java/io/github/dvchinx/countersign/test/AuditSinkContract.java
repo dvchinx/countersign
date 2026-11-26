@@ -26,8 +26,9 @@ import org.junit.jupiter.api.Test;
  * The tests every {@link AuditSink} must pass. Passing them is the bar for merging a new sink.
  *
  * <p>Extend this class in your sink's test suite and implement {@link #sink()} and {@link #storedStream(String)}. The
- * contract checks that a stored stream reads back unchanged, field for field, in sequence order, and still verifies
- * with {@code ReceiptVerifier}, including when receipts arrive out of order from concurrent calls.
+ * contract checks that a stored stream reads back unchanged, field for field (redactions included), in sequence
+ * order, and still verifies with {@code ReceiptVerifier}, including when receipts arrive out of order from concurrent
+ * calls.
  *
  * <p>Every test uses its own random stream ids, so the sink may be shared between tests, for example one database for
  * the whole class.
@@ -77,6 +78,22 @@ public abstract class AuditSinkContract {
 
         assertThat(storedStream(chain.streamId())).containsExactly(receipt);
         assertThat(receipt.matchedPolicies()).isEmpty();
+    }
+
+    @Test
+    void storesTheRedactionsOfAReceiptInOrder() {
+        ReceiptChain chain = newChain();
+        Receipt receipt = chain.append(
+                invocation("crm.find_customer", "alice", "c1"),
+                allow("crm-reads"),
+                null,
+                null,
+                List.of("no-cards", "no-contact"));
+
+        sink().append(receipt);
+
+        assertThat(storedStream(chain.streamId())).containsExactly(receipt);
+        assertThat(verifier().verify(storedStream(chain.streamId()))).isEqualTo(new VerificationResult.Valid(1));
     }
 
     @Test

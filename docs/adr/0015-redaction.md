@@ -72,7 +72,7 @@ never ambiguous.
 countersign:
   redactors:
     card-number:
-      pattern: "\\b(?:\\d[ -]?){13,19}\\b"
+      pattern: "\\b\\d(?:[ -]?\\d){12,18}\\b"
       replacement: "[CARD]"
     contact:
       fields: [email, phone]          # any value under these keys, at any depth
@@ -117,10 +117,13 @@ investigator who holds the original arguments recompute exactly what the tool re
 
 ### What a call goes through
 
-In `ToolCallGuard.check`, after the access decision and any approval, and only if the call will run:
+In `ToolCallGuard.check`, after the access decision, and only if the call will run:
 
 1. Find every redaction rule that matches. A rule whose condition throws refuses the call and is recorded as
    `EVALUATION_FAILED` with the rule's id (fail closed: a rule that cannot be checked might have been needed).
+   Rules are matched as soon as the policies have not denied the call, *before* any approval: their conditions see
+   the same proposed arguments either way, and nobody should be asked to approve a call that is then refused. The
+   rules apply, and are recorded, only if the call goes on to run.
 2. Apply the `ARGS` redactors to the arguments. If one throws, the call is refused and recorded the same way. The
    tool never runs with arguments that were meant to be redacted and were not.
 3. Write the receipt, listing the ids of the rules that apply, then return `Verdict.Proceed` with the redacted
@@ -133,7 +136,8 @@ text is redacted as one string value.
 If a `RESULT` redactor throws, the tool has **already run**: its side effects cannot be undone. The result is
 withheld, and the model gets a structured refusal (`"status":"WITHHELD"`) instead. This is logged as an error and
 counted in `countersign.audit.failures` with `stage=redaction`. The receipt is not changed (it is append-only); the
-log and the metric record the failure.
+log and the metric record the failure. The guard reports it through a new default method,
+`DecisionListener.onResultWithheld(receipt, ruleId)`, so listeners written as lambdas keep compiling.
 
 ### Receipts
 
@@ -154,7 +158,8 @@ log and the metric record the failure.
 
 ### Observability
 
-`DecisionEvent` gains the applied rule ids, so a `DecisionListener` sees them. A new counter,
+`DecisionEvent` gains the applied rules, as `Redaction(ruleId, targets)` (`core.model`), so a `DecisionListener`
+sees them and the metric can be tagged with the target. A new counter,
 `countersign.redactions` (tags `tool`, `rule`, `target`), counts redactions. Tag values stay bounded, because rule
 ids come from configuration. `countersign.decisions` does not change.
 
@@ -182,3 +187,12 @@ ids come from configuration. `countersign.decisions` does not change.
   enough, the right rule is a `deny` or a `require-approval`, not a redaction.
 - `Redactor` is a small port and a good first contribution: for example a module with locale-specific detectors
   (national ids, IBANs), each with its own contract test in `countersign-test`.
+
+## Implementation notes
+
+- Result redaction shipped first. Argument redaction needs a writer that hands the tool JSON it parses exactly as
+  before, and is left for a follow-up; until then a rule with `target: args` is rejected when it is built, so it can
+  never be accepted and silently not applied.
+- Once a redaction applies, the model gets Countersign's serialization of the redacted tree, never the tool's
+  original text, even when nothing changed: a lenient parser keeps only the last of two duplicate keys, so the
+  original text could carry a value the redactors never saw.

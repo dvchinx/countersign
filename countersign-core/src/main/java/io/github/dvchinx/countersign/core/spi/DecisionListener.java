@@ -1,6 +1,7 @@
 package io.github.dvchinx.countersign.core.spi;
 
 import io.github.dvchinx.countersign.core.model.DecisionEvent;
+import io.github.dvchinx.countersign.core.model.Receipt;
 
 /**
  * Hears about every decision, for metrics, tracing or alerting.
@@ -21,4 +22,17 @@ public interface DecisionListener {
      * @param event what was decided and how
      */
     void onDecision(DecisionEvent event);
+
+    /**
+     * Called when a tool ran but its result was withheld from the model because a redaction rule could not redact
+     * it (ADR 0015). The tool's side effects already happened; the model gets a refusal instead of the result. The
+     * receipt is not changed, so this call, the error log and the {@code countersign.audit.failures} metric are what
+     * record the failure.
+     *
+     * <p>Does nothing by default, so a listener can still be written as a lambda.
+     *
+     * @param receipt the receipt recorded for the call before the tool ran
+     * @param ruleId the redaction rule that failed
+     */
+    default void onResultWithheld(Receipt receipt, String ruleId) {}
 }

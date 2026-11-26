@@ -1,5 +1,7 @@
 package io.github.dvchinx.countersign.springai;
 
+import io.github.dvchinx.countersign.core.guard.ResultRedaction;
+import io.github.dvchinx.countersign.core.guard.ResultWithheldException;
 import io.github.dvchinx.countersign.core.guard.ToolCallGuard;
 import io.github.dvchinx.countersign.core.guard.Verdict;
 import io.github.dvchinx.countersign.core.model.Decision;
@@ -28,7 +30,8 @@ import org.springframework.ai.tool.metadata.ToolMetadata;
  * <ol>
  *   <li>parses the input strictly (see {@code ToolInputParser}); unreadable input is refused;
  *   <li>runs {@link ToolCallGuard#check}, which evaluates the policies and records a signed receipt;
- *   <li>runs the wrapped tool only on {@link Verdict.Proceed}, passing it the original input and context unchanged.
+ *   <li>runs the wrapped tool only on {@link Verdict.Proceed}, passing it the original input and context unchanged;
+ *   <li>passes the tool's result through the redaction rules that apply to the call, if any (ADR 0015).
  * </ol>
  *
  * <p>A refusal is returned to the model as a small JSON object it can explain to the user, for example
@@ -36,6 +39,10 @@ import org.springframework.ai.tool.metadata.ToolMetadata;
  * "status":"REFUSED","tool":"db_query"}}. It never contains a stack trace, argument values or internal errors. Any
  * unexpected failure in Countersign is also a refusal (fail closed). Exceptions thrown by the tool itself are passed
  * on untouched, as if Countersign were not there.
+ *
+ * <p>If a result cannot be redacted, the tool has already run, but its result never reaches the model. The model gets
+ * {@code {"invocationId":"…","reason":"…","status":"WITHHELD","tool":"crm_find_customer"}} instead, and the failure
+ * is logged and counted in {@code countersign.audit.failures} with {@code stage=redaction}.
  *
  * <p>The principal and conversation id recorded in receipts are read from the {@link ToolContext}, under
  * {@link #PRINCIPAL_KEY} and {@link #CONVERSATION_ID_KEY}. A {@link Principal} value is recorded by its name; any
@@ -52,6 +59,8 @@ public final class GuardedToolCallback implements ToolCallback {
     private static final Logger LOG = LoggerFactory.getLogger(GuardedToolCallback.class);
 
     private static final String UNEXPECTED_FAILURE = "The call was blocked because Countersign could not check it";
+    private static final String RESULT_WITHHELD =
+            "The tool ran, but its result was withheld because Countersign could not redact it";
 
     private final ToolCallback delegate;
     private final ToolCallGuard guard;
@@ -127,9 +136,30 @@ public final class GuardedToolCallback implements ToolCallback {
             return refusal(toolName, invocationId, Decision.Type.DENY, UNEXPECTED_FAILURE);
         }
         return switch (verdict) {
-            case Verdict.Proceed proceed -> delegate.call(toolInput, toolContext);
+            case Verdict.Proceed proceed ->
+                redact(toolName, invocationId, proceed.resultRedaction(), delegate.call(toolInput, toolContext));
             case Verdict.Refuse refuse -> refusal(toolName, invocationId, refuse.decision(), refuse.reason());
         };
+    }
+
+    private static @Nullable String redact(
+            String toolName, String invocationId, ResultRedaction redaction, @Nullable String result) {
+        if (redaction.isEmpty() || result == null) {
+            return result;
+        }
+        try {
+            return ToolResults.redact(result, redaction);
+        } catch (ResultWithheldException e) {
+            // Already logged and reported to listeners by the guard.
+            return withheld(toolName, invocationId);
+        } catch (RuntimeException e) {
+            LOG.error(
+                    "Countersign could not redact the result of tool '{}' ({}); withholding it from the model",
+                    toolName,
+                    e.getClass().getName());
+            LOG.debug("Countersign redaction failure details", e);
+            return withheld(toolName, invocationId);
+        }
     }
 
     private Verdict check(
@@ -166,6 +196,15 @@ public final class GuardedToolCallback implements ToolCallback {
                 .put("tool", toolName)
                 .put("decision", decision.name())
                 .put("reason", reason)
+                .put("invocationId", invocationId)
+                .build());
+    }
+
+    private static String withheld(String toolName, String invocationId) {
+        return CanonicalJson.write(JsonObject.builder()
+                .put("status", "WITHHELD")
+                .put("tool", toolName)
+                .put("reason", RESULT_WITHHELD)
                 .put("invocationId", invocationId)
                 .build());
     }

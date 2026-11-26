@@ -94,17 +94,20 @@ Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)               
                           │     conversation id). Unreadable input → refused and recorded.
                           └─ ToolCallGuard.check(invocation) ──► Verdict           (countersign-core)
                                ├─ 2. PolicyEngine.evaluate(invocation) ──► EvaluationResult
-                               ├─ 3. REQUIRE_APPROVAL only: ApprovalGateway, wait up to the timeout;
+                               ├─ 3. Not denied: find every matching redaction rule (before approval, so
+                               │     nobody approves a call that is refused anyway); a rule condition that
+                               │     throws → refuse and record as EVALUATION_FAILED (ADR 0015)
+                               ├─ 4. REQUIRE_APPROVAL only: ApprovalGateway, wait up to the timeout;
                                │     rejected / timed out / no gateway / error → refuse (ADR 0008)
-                               ├─ 4. Calls that will run: every matching redaction rule applies; ARGS
-                               │     redactors run now; failure → refuse and record (ADR 0015)
                                ├─ 5. ReceiptChain.append ──► signed Receipt, with approval outcome,
                                │     approver and applied redactions (before the tool runs)
                                ├─ 6. AuditSink.append(receipt) + Micrometer observation
                                └─ 7. Apply decision:
-                                      ALLOW / approved → delegate to the real ToolCallback with the
-                                                         redacted args; RESULT redactors run on its
-                                                         result (failure → result withheld)
+                                      ALLOW / approved → delegate to the real ToolCallback; RESULT
+                                                         redactors run on its result (failure →
+                                                         result withheld, stage=redaction metric).
+                                                         ARGS redaction is not implemented yet:
+                                                         target args is rejected at startup
                                       DENY / not approved → structured refusal (no exception leak)
 ```
 
@@ -114,12 +117,13 @@ Agent (ChatClient) ──► GuardedToolCallback.call(input, ctx)               
 - `Decision` (sealed interface): `Allow`, `Deny(reason)`, `RequireApproval(reason)`. Redaction is not a
   decision: it is an obligation on calls that run (ADR 0015).
 - `Policy`: id, target tools (glob), condition, decision, priority.
-- `RedactionRule`: id, target tools (glob), condition, target (args / result), redactor names. Every
+- `RedactionRule`: id, target tools (glob), condition, target (result; args planned), redactors. Every
   matching rule applies; order between rules and policies cannot drop one (ADR 0015).
 - `PolicyEngine`: evaluates policies in priority order; first match wins; if nothing matches,
   applies the configured default (`deny` by default).
-- `Receipt` (record): invocation id, tool, args HMAC-SHA256 (ADR 0004), decision, matched policy ids, approval
-  outcome and approver (ADR 0008), timestamp, `previousHash`, `hash`, `signature`.
+- `Receipt` (record): invocation id, tool, args HMAC-SHA256 (ADR 0004), decision, matched policy ids, redaction
+  rule ids (ADR 0015), approval outcome and approver (ADR 0008), timestamp, `previousHash`, `hash`, `signature`.
+  Fields added after 0.1.0 are left out of the hashed JSON when empty, so 0.1.0 receipts keep verifying.
 
 ### Integration points (spring-ai module)
 
@@ -204,7 +208,8 @@ Integration tests that need PostgreSQL use Testcontainers; Docker must be runnin
   `RuntimeException` from a policy reach the model as a stack trace.
 - Logging: SLF4J, structured where possible, never include argument values or secrets.
 - Metrics: `countersign.decisions` (tags: `tool`, `decision`, `policy`, `basis`, `outcome`, `approval`),
-  `countersign.evaluation` (timer, tag `tool`), `countersign.audit.failures` (counter, tags `tool`, `stage`).
+  `countersign.evaluation` (timer, tag `tool`), `countersign.redactions` (counter, tags `tool`, `rule`, `target`),
+  `countersign.audit.failures` (counter, tags `tool`, `stage`: `receipt`, `sink` or `redaction`).
   They are published by a `DecisionListener` (ADR 0011); tag values must stay bounded.
 
 ## Testing rules

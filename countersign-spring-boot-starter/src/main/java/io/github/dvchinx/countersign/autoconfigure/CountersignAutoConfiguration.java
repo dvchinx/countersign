@@ -7,11 +7,13 @@ import io.github.dvchinx.countersign.core.policy.Policy;
 import io.github.dvchinx.countersign.core.policy.PolicyEngine;
 import io.github.dvchinx.countersign.core.receipt.ArgumentsHmac;
 import io.github.dvchinx.countersign.core.receipt.ReceiptChain;
+import io.github.dvchinx.countersign.core.redaction.RedactionRule;
 import io.github.dvchinx.countersign.core.spi.ApprovalGateway;
 import io.github.dvchinx.countersign.core.spi.AuditSink;
 import io.github.dvchinx.countersign.core.spi.DecisionListener;
 import io.github.dvchinx.countersign.core.spi.PrincipalResolver;
 import io.github.dvchinx.countersign.core.spi.ReceiptSigner;
+import io.github.dvchinx.countersign.core.spi.Redactor;
 import io.github.dvchinx.countersign.springai.CountersignToolCallingBeanPostProcessor;
 import io.github.dvchinx.countersign.springai.annotation.RequiresApprovalPolicies;
 import io.github.dvchinx.countersign.springai.security.SpringSecurityPrincipalResolver;
@@ -25,6 +27,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -45,8 +48,9 @@ import org.springframework.security.core.context.SecurityContextHolderStrategy;
  *
  * <p>Every bean backs off when the application defines its own of the same type, so any part can be replaced: a
  * persistent {@link AuditSink}, a KMS-backed {@link ReceiptSigner}, or a {@link PolicyEngine} built in code.
- * {@link Policy} beans are added to the configured policies, and every {@link DecisionListener} bean hears about each
- * decision.
+ * {@link Policy} beans are added to the configured policies, {@link RedactionRule} beans to the configured redaction
+ * rules, {@link Redactor} beans can be named in {@code countersign.redactions[n].redactors} by their bean name, and every
+ * {@link DecisionListener} bean hears about each decision.
  *
  * <p>When Spring Security is on the classpath, the signed-in user becomes the principal of every tool call that does
  * not carry one in its tool context ({@link SpringSecurityPrincipalResolver}); a {@link PrincipalResolver} bean of the
@@ -135,12 +139,16 @@ public class CountersignAutoConfiguration {
                 ObjectProvider<ApprovalGateway> approvals,
                 ObjectProvider<DecisionListener> listeners,
                 ObjectProvider<PrincipalResolver> principals,
+                ObjectProvider<RedactionRule> redactionRules,
+                ListableBeanFactory beans,
                 CountersignProperties properties) {
             ToolCallGuard.Builder guard = ToolCallGuard.builder(engine, receipts, auditSink)
+                    .redactions(RedactionFactory.fromProperties(properties, beans.getBeansOfType(Redactor.class)))
                     .approvals(approvals.getIfUnique())
                     .principalResolver(principals.getIfUnique())
                     .approvalTimeout(properties.getApproval().getTimeout())
                     .strictAudit(properties.getAudit().isStrict());
+            redactionRules.orderedStream().forEach(guard::redaction);
             listeners.orderedStream().forEach(guard::listener);
             return guard.build();
         }
@@ -148,6 +156,7 @@ public class CountersignAutoConfiguration {
         @Bean
         SmartInitializingSingleton countersignStartupReport(
                 PolicyEngine engine,
+                ToolCallGuard guard,
                 ReceiptChain receipts,
                 AuditSink auditSink,
                 ObjectProvider<ApprovalGateway> approvals,
@@ -158,9 +167,10 @@ public class CountersignAutoConfiguration {
                 PrincipalResolver principalResolver = principals.getIfUnique();
                 int total =
                         engine.policies().size() + engine.mandatoryPolicies().size();
+                int redactions = guard.redactionRules().size();
                 LOG.info(
                         "Countersign is active: {} {} ({} from @RequiresApproval), default decision {}, receipts"
-                                + " stream '{}', audit sink {}{}, approvals {}, principal from {}",
+                                + " stream '{}', audit sink {}{}, approvals {}, principal from {}, {} redaction {}",
                         total,
                         total == 1 ? "policy" : "policies",
                         engine.mandatoryPolicies().size(),
@@ -175,7 +185,9 @@ public class CountersignAutoConfiguration {
                         principalResolver == null
                                 ? "tool context only"
                                 : "tool context, then "
-                                        + principalResolver.getClass().getSimpleName());
+                                        + principalResolver.getClass().getSimpleName(),
+                        redactions,
+                        redactions == 1 ? "rule" : "rules");
                 boolean approvalNeeded = engine.defaultDecision().type() == Decision.Type.REQUIRE_APPROVAL
                         || Stream.concat(engine.policies().stream(), engine.mandatoryPolicies().stream())
                                 .anyMatch(policy -> policy.decision().type() == Decision.Type.REQUIRE_APPROVAL);
