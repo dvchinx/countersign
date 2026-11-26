@@ -394,10 +394,11 @@ touching the policy engine:
 - **`ApprovalGateway`:** Slack, Teams, email or a web console approver
 - **`AuditSink`:** Kafka, S3, OpenSearch, or your SIEM
 - **`ReceiptSigner`:** KMS / HSM-backed signing
+- **`Redactor`:** detectors for national ids, IBANs or secrets in tool calls
 - **`PrincipalResolver`:** who the agent acts for, from a gateway header, a JWT or an MCP client's identity
 
-Passing the port's contract test in `countersign-test` is the bar for merging (`AuditSinkContract` today;
-contracts for the other ports are good first contributions). Start with [`CONTRIBUTING.md`](CONTRIBUTING.md);
+Passing the port's contract test in `countersign-test` is the bar for merging (`AuditSinkContract` and
+`RedactorContract` today; contracts for the other ports are good first contributions). Start with [`CONTRIBUTING.md`](CONTRIBUTING.md);
 issues labelled `good first issue` are the best place to begin. To report a vulnerability, see
 [`SECURITY.md`](SECURITY.md).
 
