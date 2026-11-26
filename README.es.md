@@ -96,17 +96,17 @@ Al arrancar verás una línea en el log que indica que Countersign está activo 
 
 <p align="center">
   <img src="docs/images/tool-call-flow.drawio.svg" width="860"
-       alt="Flujo de una llamada: el agente propone la llamada, GuardedToolCallback consulta al PolicyEngine, que devuelve ALLOW, REDACT, REQUIRE APPROVAL o DENY. Las llamadas permitidas, redactadas o aprobadas ejecutan la herramienta; las denegadas, rechazadas o vencidas devuelven un rechazo estructurado. Todos los caminos generan un recibo firmado que va al AuditSink y a Micrometer.">
+       alt="Flujo de una llamada: el agente propone la llamada, GuardedToolCallback consulta al PolicyEngine, que devuelve ALLOW, REQUIRE APPROVAL o DENY. Cada decisión, con la respuesta del humano cuando hacía falta aprobación, genera un recibo firmado antes de que la herramienta se ejecute, que va al AuditSink y a Micrometer. Las llamadas permitidas o aprobadas ejecutan la herramienta, y su resultado pasa por cada regla de redacción que coincida; las denegadas, rechazadas o vencidas reciben un rechazo estructurado. Cualquiera de los dos vuelve al modelo. Una nota aclara que la redacción no es una decisión: toda regla que coincide se aplica a cada llamada que se ejecuta, también a las aprobadas.">
 </p>
 
 1. **Construye** un `ToolInvocation`: nombre de la herramienta, argumentos parseados, principal e id de conversación.
 2. **Evalúa** la invocación contra tus políticas, en orden de prioridad. Gana la primera que coincide; si ninguna coincide, se aplica la decisión por defecto (`deny`). Con `REQUIRE_APPROVAL`, espera a un humano hasta que venza el plazo.
-3. **Registra** un recibo: la decisión, las políticas que coincidieron, quién la aprobó, un hash con clave (HMAC-SHA256) de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
-4. **Aplica** la decisión: ejecuta la herramienta si se permitió o se aprobó, y pasa su resultado por cada regla de
+3. **Registra** un recibo: la decisión, las políticas que coincidieron, quién la aprobó, las reglas de redacción que se aplican, un hash con clave (HMAC-SHA256) de los argumentos (nunca los valores en crudo), el hash del recibo anterior y una firma Ed25519.
+4. **Publica** el recibo en tu `AuditSink`, junto con métricas y observaciones de Micrometer.
+5. **Aplica** la decisión: ejecuta la herramienta si se permitió o se aprobó, y pasa su resultado por cada regla de
    redacción que coincida antes de que el modelo lo vea; si no, devuelve un rechazo estructurado.
 
 El recibo se firma antes de que la herramienta se ejecute: si la firma falla, la herramienta no corre.
-5. **Publica** el recibo en tu `AuditSink`, junto con métricas y observaciones de Micrometer.
 
 El control ocurre **donde se ejecuta la herramienta**, no en la lista de herramientas que se le envía
 al modelo. Una herramienta que nunca se le ofreció al modelo, o una que lo engañaron para llamar,

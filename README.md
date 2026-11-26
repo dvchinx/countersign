@@ -94,17 +94,17 @@ On startup you'll see one line telling you Countersign is active and which defau
 
 <p align="center">
   <img src="docs/images/tool-call-flow.drawio.svg" width="860"
-       alt="Tool call flow: the agent proposes a call, GuardedToolCallback asks the PolicyEngine, which returns ALLOW, REDACT, REQUIRE APPROVAL or DENY. Allowed, redacted and approved calls run the tool; denied, rejected or timed-out calls return a structured refusal. Every path produces a signed receipt sent to the AuditSink and Micrometer.">
+       alt="Tool call flow: the agent proposes a call, GuardedToolCallback asks the PolicyEngine, which returns ALLOW, REQUIRE APPROVAL or DENY. Every decision, with the human's answer when approval was needed, produces a signed receipt before the tool runs, sent to the AuditSink and Micrometer. Allowed and approved calls run the tool, and its result passes through every matching redaction rule; denied, rejected or timed-out calls get a structured refusal. Either one goes back to the model. A note says that redaction is not a decision: every matching rule applies to every call that runs, approved calls included.">
 </p>
 
 1. **Build** a `ToolInvocation`: tool name, parsed arguments, principal, conversation id.
 2. **Evaluate** it against your policies, in priority order. The first match wins; if nothing matches, the default (`deny`) applies. On `REQUIRE_APPROVAL`, wait for a human until the timeout.
-3. **Record** a receipt: the decision, the matched policies, who approved it, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
-4. **Apply** the decision: run the tool if it was allowed or approved, and pass its result through every redaction
+3. **Record** a receipt: the decision, the matched policies, who approved it, the redaction rules that apply, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
+4. **Publish** it to your `AuditSink`, along with Micrometer metrics and observations.
+5. **Apply** the decision: run the tool if it was allowed or approved, and pass its result through every redaction
    rule that matches before the model sees it; otherwise return a structured refusal.
 
 The receipt is signed before the tool runs: if signing fails, the tool does not run.
-5. **Publish** it to your `AuditSink`, along with Micrometer metrics and observations.
 
 Enforcement happens **where the tool runs**, not in the list of tools sent to the model. A tool the
 model was never offered, or one it was tricked into calling, still has to pass the policy engine.
