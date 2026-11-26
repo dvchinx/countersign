@@ -66,6 +66,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `GuardedToolCallingManager` is no longer `final` (its methods are), so that its Spring AI 2.1 variant can extend it.
 
 - The READMEs list the steps of a tool call in the order they happen: the receipt is recorded before the tool runs.
+- The tool call diagram shows three decisions plus result redaction, and the receipt recorded and published before
+  the tool runs, with its HMAC of the arguments. Its alt text and the steps under it match.
 - The release build waits until the Central Portal validates the bundle instead of until it is published, so slow
   publishing no longer fails the release workflow after a successful upload.
 
