@@ -36,7 +36,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * fails on the primary key, so a stream cannot hold two receipts with the same sequence.
  *
  * <p>Create the table with {@link #createSchema(DataSource)}, or run {@link #SCHEMA_RESOURCE} with your own
- * migration tool. Requires PostgreSQL 14 or later. Thread-safe.
+ * migration tool. A table created by 0.1.0 lacks the {@code redactions} column (ADR 0015): {@code createSchema} adds
+ * it, and a migration tool must run {@link #ADD_REDACTIONS_COLUMN}. Requires PostgreSQL 14 or later. Thread-safe.
  */
 public final class JdbcAuditSink implements AuditSink {
 
@@ -46,16 +47,23 @@ public final class JdbcAuditSink implements AuditSink {
     /** The table receipts are stored in. */
     public static final String TABLE = "countersign_receipt";
 
+    /**
+     * The statement that brings a table created by 0.1.0 up to date, for applications that manage the schema
+     * themselves. Run it before upgrading: without the column, every insert fails.
+     */
+    public static final String ADD_REDACTIONS_COLUMN =
+            "ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS redactions text[] NOT NULL DEFAULT '{}'";
+
     // Any constant works; it only has to be the same for every instance creating the schema at once.
     private static final long SCHEMA_LOCK_KEY = 0x436f_756e_7465_7273L;
 
     private static final String COLUMNS =
             "stream_id, sequence_number, invocation_id, tool, args_hmac, decision, reason,"
                     + " basis, matched_policies, approval, approver, principal, conversation_id, created_at, previous_hash,"
-                    + " hash, signature";
+                    + " hash, signature, redactions";
 
     private static final String INSERT =
-            "INSERT INTO " + TABLE + " (" + COLUMNS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            "INSERT INTO " + TABLE + " (" + COLUMNS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final String SELECT_STREAM =
             "SELECT " + COLUMNS + " FROM " + TABLE + " WHERE stream_id = ? ORDER BY sequence_number";
@@ -75,11 +83,12 @@ public final class JdbcAuditSink implements AuditSink {
     }
 
     /**
-     * Creates the receipts table and its append-only triggers, unless the table already exists.
+     * Creates the receipts table and its append-only triggers, unless the table already exists, and adds any column a
+     * newer version needs to a table that lacks it.
      *
      * <p>Safe to call from several instances starting at the same time: they take turns on a transaction-scoped
-     * advisory lock. When the table exists nothing is run, so an application role with only {@code INSERT} and
-     * {@code SELECT} rights can call it once the table has been created by a migration.
+     * advisory lock. When the table is up to date nothing is run, so an application role with only {@code INSERT}
+     * and {@code SELECT} rights can call it once the table has been created and migrated.
      *
      * @param dataSource a PostgreSQL data source whose user may create tables, the first time
      * @throws org.springframework.dao.DataAccessException if the script fails
@@ -93,8 +102,21 @@ public final class JdbcAuditSink implements AuditSink {
             Boolean exists = jdbc.queryForObject("SELECT to_regclass(?) IS NOT NULL", Boolean.class, TABLE);
             if (!Boolean.TRUE.equals(exists)) {
                 jdbc.execute(script);
+            } else if (!hasColumn(jdbc, "redactions")) {
+                jdbc.execute(ADD_REDACTIONS_COLUMN);
             }
         });
+    }
+
+    // Checked before altering, because ALTER TABLE needs the table's owner even when the column already exists.
+    private static boolean hasColumn(JdbcTemplate jdbc, String column) {
+        Boolean present = jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass(?) AND attname = ?"
+                        + " AND NOT attisdropped)",
+                Boolean.class,
+                TABLE,
+                column);
+        return Boolean.TRUE.equals(present);
     }
 
     /**
@@ -110,6 +132,8 @@ public final class JdbcAuditSink implements AuditSink {
         jdbc.update(INSERT, ps -> {
             Array policies = ps.getConnection()
                     .createArrayOf("text", receipt.matchedPolicies().toArray(String[]::new));
+            Array redactions = ps.getConnection()
+                    .createArrayOf("text", receipt.redactions().toArray(String[]::new));
             try {
                 ps.setString(1, receipt.streamId());
                 ps.setLong(2, receipt.sequence());
@@ -130,8 +154,10 @@ public final class JdbcAuditSink implements AuditSink {
                 ps.setString(15, receipt.previousHash());
                 ps.setString(16, receipt.hash());
                 ps.setString(17, receipt.signature());
+                ps.setArray(18, redactions);
             } finally {
                 policies.free();
+                redactions.free();
             }
         });
     }
@@ -171,7 +197,8 @@ public final class JdbcAuditSink implements AuditSink {
                     Decision.Type.valueOf(rs.getString("decision")),
                     rs.getString("reason"),
                     EvaluationResult.Basis.valueOf(rs.getString("basis")),
-                    policies(rs),
+                    strings(rs, "matched_policies"),
+                    strings(rs, "redactions"),
                     approval(rs.getString("approval")),
                     rs.getString("approver"),
                     rs.getString("principal"),
@@ -188,8 +215,8 @@ public final class JdbcAuditSink implements AuditSink {
         }
     };
 
-    private static List<String> policies(ResultSet rs) throws SQLException {
-        Array array = rs.getArray("matched_policies");
+    private static List<String> strings(ResultSet rs, String column) throws SQLException {
+        Array array = rs.getArray(column);
         try {
             return Arrays.asList((String[]) array.getArray());
         } finally {

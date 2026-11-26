@@ -13,6 +13,16 @@ class CountersignFailureAnalyzer extends AbstractFailureAnalyzer<CountersignExce
 
     @Override
     protected FailureAnalysis analyze(Throwable rootFailure, CountersignException cause) {
+        String message = cause.getMessage();
+        if (cause instanceof InvalidPolicyException && message != null && message.startsWith("countersign.redact")) {
+            return new FailureAnalysis(
+                    "Countersign could not load its redaction rules: " + message,
+                    "Fix the property named above. Each entry under countersign.redactors needs either 'pattern' (a"
+                            + " valid regular expression that cannot match empty text) or 'fields'. Each rule under"
+                            + " countersign.redactions needs a unique id, at least one tool pattern, 'target: result'"
+                            + " and the names of known redactors; 'when' must be a valid SpEL expression.",
+                    cause);
+        }
         if (cause instanceof InvalidPolicyException) {
             return new FailureAnalysis(
                     "Countersign could not load its policies: " + cause.getMessage(),

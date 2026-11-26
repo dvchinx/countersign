@@ -1,9 +1,14 @@
 package io.github.dvchinx.countersign.autoconfigure;
 
 import io.github.dvchinx.countersign.core.model.Decision;
+import io.github.dvchinx.countersign.core.model.Redaction;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -28,6 +33,18 @@ public class CountersignProperties {
 
     /** Policies, evaluated by ascending priority, then in the order listed. The first one that applies decides. */
     private List<PolicyProperties> policies = new ArrayList<>();
+
+    /**
+     * Named redactors that redaction rules refer to. Each has either a regular expression ('pattern') or a list of
+     * key names ('fields'). Redactor beans of the application are also available, under their bean names.
+     */
+    private Map<String, RedactorProperties> redactors = new LinkedHashMap<>();
+
+    /**
+     * Redaction rules. Unlike policies, every rule that matches a call that runs applies to it, whatever decided
+     * access, in the order listed (ADR 0015).
+     */
+    private List<RedactionProperties> redactions = new ArrayList<>();
 
     /**
      * Extra packages scanned for @RequiresApproval tool methods. The application's own packages (those of its
@@ -74,6 +91,22 @@ public class CountersignProperties {
 
     public void setPolicies(List<PolicyProperties> policies) {
         this.policies = policies;
+    }
+
+    public Map<String, RedactorProperties> getRedactors() {
+        return redactors;
+    }
+
+    public void setRedactors(Map<String, RedactorProperties> redactors) {
+        this.redactors = redactors;
+    }
+
+    public List<RedactionProperties> getRedactions() {
+        return redactions;
+    }
+
+    public void setRedactions(List<RedactionProperties> redactions) {
+        this.redactions = redactions;
     }
 
     public List<String> getAnnotationPackages() {
@@ -196,6 +229,108 @@ public class CountersignProperties {
 
         public void setPriority(int priority) {
             this.priority = priority;
+        }
+    }
+
+    /** One redactor, as written under {@code countersign.redactors.<name>}. Set either 'pattern' or 'fields'. */
+    public static class RedactorProperties {
+
+        /**
+         * Regular expression (java.util.regex) whose matches are replaced in every string value of the result, and
+         * in every number whose digits match. Keep it simple: it runs on data the model controls.
+         */
+        private @Nullable String pattern;
+
+        /** Key names whose values are replaced, at any depth, ignoring case. */
+        private List<String> fields = new ArrayList<>();
+
+        /** Literal text that replaces each match or value. */
+        private String replacement = "[REDACTED]";
+
+        public @Nullable String getPattern() {
+            return pattern;
+        }
+
+        public void setPattern(@Nullable String pattern) {
+            this.pattern = pattern;
+        }
+
+        public List<String> getFields() {
+            return fields;
+        }
+
+        public void setFields(List<String> fields) {
+            this.fields = fields;
+        }
+
+        public String getReplacement() {
+            return replacement;
+        }
+
+        public void setReplacement(String replacement) {
+            this.replacement = replacement;
+        }
+    }
+
+    /** One redaction rule, as written under {@code countersign.redactions}. */
+    public static class RedactionProperties {
+
+        /** Unique id, shared with policy ids and recorded in receipts. Letters, digits, '.', '_' and '-'. */
+        private @Nullable String id;
+
+        /** Tool name globs this rule applies to, such as {@code crm_*}. At least one. */
+        private List<String> tools = new ArrayList<>();
+
+        /**
+         * Optional SpEL condition over the arguments the model proposed, with the same sandbox and variables as a
+         * policy condition.
+         */
+        private @Nullable String when;
+
+        /** What to redact: 'result'. Redacting arguments is not supported yet. */
+        private Set<Redaction.Target> target = EnumSet.noneOf(Redaction.Target.class);
+
+        /** Names of the redactors to apply, in order: keys of countersign.redactors, or Redactor bean names. */
+        private List<String> redactors = new ArrayList<>();
+
+        public @Nullable String getId() {
+            return id;
+        }
+
+        public void setId(@Nullable String id) {
+            this.id = id;
+        }
+
+        public List<String> getTools() {
+            return tools;
+        }
+
+        public void setTools(List<String> tools) {
+            this.tools = tools;
+        }
+
+        public @Nullable String getWhen() {
+            return when;
+        }
+
+        public void setWhen(@Nullable String when) {
+            this.when = when;
+        }
+
+        public Set<Redaction.Target> getTarget() {
+            return target;
+        }
+
+        public void setTarget(Set<Redaction.Target> target) {
+            this.target = target;
+        }
+
+        public List<String> getRedactors() {
+            return redactors;
+        }
+
+        public void setRedactors(List<String> redactors) {
+            this.redactors = redactors;
         }
     }
 

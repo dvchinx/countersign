@@ -7,7 +7,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Breaking
+
+- `countersign-audit-jdbc` stores a new `redactions` column. `JdbcAuditSink.createSchema` (the default,
+  `countersign.audit.jdbc.initialize-schema=true`) adds it to a table created by 0.1.0. If you manage the schema with
+  Flyway or Liquibase, run `JdbcAuditSink.ADD_REDACTIONS_COLUMN`
+  (`ALTER TABLE countersign_receipt ADD COLUMN IF NOT EXISTS redactions text[] NOT NULL DEFAULT '{}'`) as a migration
+  before upgrading; without it every insert fails (refused calls with `countersign.audit.strict=true`, otherwise
+  logged and counted).
+- `Receipt`, `DecisionEvent` and `Verdict.Proceed` gained a record component (ADR 0015). Their 0.1.0 constructors
+  are kept, so code that builds them still compiles; only record deconstruction patterns over them
+  (`case Verdict.Proceed(var receipt)`) need the new component.
+
 ### Added
+
+- Redaction of tool results ([ADR 0015](docs/adr/0015-redaction.md)). Redaction rules under
+  `countersign.redactions` pass a tool's result through named redactors before the model sees it. Unlike policies,
+  every rule that matches a call that runs applies, whatever decided access, so an approved call is redacted too and
+  no `allow` listed earlier can drop a rule. Built-in redactors, configured under `countersign.redactors`: by
+  regular expression (`pattern`, also matching numbers whose digits match) and by key name (`fields`, at any depth).
+  A new port, `Redactor`, works on the core JSON tree; `Redactor` beans can be named by their bean name, and
+  `RedactionRule` beans are added to the configured rules. A broken rule (unknown redactor, invalid pattern, missing
+  target, an id already used by a policy) stops the application at startup and names the property. A rule whose
+  condition throws refuses the call; a redactor that throws withholds the result (`"status":"WITHHELD"`), because the
+  tool already ran. Redacting arguments is planned; `target: args` is rejected at startup for now.
+- Receipts record the redaction rules that applied, in a new `redactions` field. It is left out of the hashed JSON
+  when empty, so receipts from 0.1.0 keep verifying with no version field; a test pins two receipts signed by 0.1.0.
+- `countersign.redactions` counter (tags `tool`, `rule`, `target`) and `stage=redaction` in
+  `countersign.audit.failures` for withheld results. `DecisionEvent.redactions()` and the default method
+  `DecisionListener.onResultWithheld` let your own listeners see both.
+- `AuditSinkContract` checks that a sink stores a receipt's redactions.
 
 - The signed-in Spring Security user is now the principal of each tool call, in policies (`#principal`) and receipts,
   with no code ([ADR 0014](docs/adr/0014-principal-from-spring-security.md)). A new port, `PrincipalResolver`, tells
@@ -26,9 +55,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- Redaction is planned as an obligation on calls that run, not as a fourth decision
+- Redaction is an obligation on calls that run, not a fourth decision
   ([ADR 0015](docs/adr/0015-redaction.md)), so that no approval or policy order can drop it. CLAUDE.md and the
   READMEs no longer describe `REDACT` as a decision.
+- The startup line says how many redaction rules are active.
 - Starter default: in applications with Spring Security, receipts now name the signed-in user and `#principal`
   policies match it, where before they saw no principal unless the tool context set one (ADR 0014).
 - CI runs the full test suite on Spring AI 2.0.2 and 2.1.0. A new, unpublished `compat/spring-ai-2.1` module tests

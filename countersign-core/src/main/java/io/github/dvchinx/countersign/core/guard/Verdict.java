@@ -14,19 +14,32 @@ import org.jspecify.annotations.Nullable;
 public sealed interface Verdict permits Verdict.Proceed, Verdict.Refuse {
 
     /**
-     * The tool may run.
+     * The tool may run. Its result must go through {@link #resultRedaction()} before it reaches the model.
      *
      * @param receipt the receipt recorded for the call
+     * @param resultRedaction what to redact from the tool's result; {@linkplain ResultRedaction#isEmpty() empty} when
+     *     no redaction rule targets it
      */
-    record Proceed(Receipt receipt) implements Verdict {
+    record Proceed(Receipt receipt, ResultRedaction resultRedaction) implements Verdict {
 
         /**
          * Creates the verdict.
          *
          * @param receipt the receipt recorded for the call
+         * @param resultRedaction what to redact from the tool's result
          */
         public Proceed {
             Objects.requireNonNull(receipt, "receipt");
+            Objects.requireNonNull(resultRedaction, "resultRedaction");
+        }
+
+        /**
+         * Creates the verdict for a call whose result is not redacted, as 0.1.0 did.
+         *
+         * @param receipt the receipt recorded for the call
+         */
+        public Proceed(Receipt receipt) {
+            this(receipt, ResultRedaction.none());
         }
     }
 

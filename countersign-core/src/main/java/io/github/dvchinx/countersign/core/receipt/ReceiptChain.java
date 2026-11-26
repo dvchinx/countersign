@@ -121,8 +121,36 @@ public final class ReceiptChain {
             EvaluationResult result,
             @Nullable ApprovalOutcome approval,
             @Nullable String approver) {
+        return append(invocation, result, approval, approver, List.of());
+    }
+
+    /**
+     * Creates, signs and links the receipt for an invocation, with the redaction rules that apply to it.
+     *
+     * @param invocation the invocation that was evaluated
+     * @param result what the policy engine decided
+     * @param approval what happened to the approval; only for a {@link Decision.RequireApproval} decision
+     * @param approver who approved or rejected the call; only when somebody answered
+     * @param redactions the ids of the redaction rules that apply, in the order they are applied; only for a call
+     *     that runs (allowed, or approved)
+     * @return the signed receipt
+     * @throws IllegalArgumentException if the approval fields do not fit the decision, or redactions are given for a
+     *     call that does not run
+     * @throws ReceiptException if hashing or signing fails; the chain does not advance and the call must be denied
+     */
+    public Receipt append(
+            ToolInvocation invocation,
+            EvaluationResult result,
+            @Nullable ApprovalOutcome approval,
+            @Nullable String approver,
+            List<String> redactions) {
         Objects.requireNonNull(invocation, "invocation");
         Objects.requireNonNull(result, "result");
+        List<String> applied = List.copyOf(redactions);
+        boolean runs = result.decision() instanceof Decision.Allow || approval == ApprovalOutcome.APPROVED;
+        if (!applied.isEmpty() && !runs) {
+            throw new IllegalArgumentException("redactions are recorded only for a call that runs");
+        }
         if (approval != null && !(result.decision() instanceof Decision.RequireApproval)) {
             throw new IllegalArgumentException("approval is only recorded for a require-approval decision");
         }
@@ -145,6 +173,7 @@ public final class ReceiptChain {
                     reasonOf(result.decision()),
                     result.basis(),
                     matchedPolicies,
+                    applied,
                     approval,
                     approver,
                     invocation.principal(),

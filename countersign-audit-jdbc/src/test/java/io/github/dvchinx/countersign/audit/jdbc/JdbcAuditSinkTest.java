@@ -18,6 +18,10 @@ import io.github.dvchinx.countersign.core.policy.Policy;
 import io.github.dvchinx.countersign.core.policy.PolicyEngine;
 import io.github.dvchinx.countersign.core.receipt.ReceiptChain;
 import io.github.dvchinx.countersign.core.receipt.VerificationResult;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -218,5 +222,70 @@ class JdbcAuditSinkTest {
                                     assertThat(receipt.basis()).isEqualTo(EvaluationResult.Basis.DEFAULT_DECISION);
                                     assertThat(receipt).isEqualTo(refuse.receipt());
                                 }));
+    }
+
+    @Test
+    void upgradesATableCreatedBy010AndKeepsItsReceiptsVerifiable() throws Exception {
+        DataSource old = TestDatabase.freshSchema();
+        JdbcTemplate oldSql = new JdbcTemplate(old);
+        try (InputStream script = getClass().getClassLoader().getResourceAsStream("schema-postgresql-0.1.0.sql")) {
+            oldSql.execute(new String(script.readAllBytes(), StandardCharsets.UTF_8));
+        }
+        ReceiptChain chain = newChain();
+        Receipt before = chain.append(invocation("accounts.balance", "alice", "c1"), allow("read-only"));
+        // Written the way 0.1.0 wrote it, with no redactions column.
+        oldSql.update(
+                "INSERT INTO countersign_receipt (stream_id, sequence_number, invocation_id, tool, args_hmac, decision,"
+                        + " reason, basis, matched_policies, approval, approver, principal, conversation_id,"
+                        + " created_at, previous_hash, hash, signature)"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::text[], ?, ?, ?, ?, ?, ?, ?, ?)",
+                before.streamId(),
+                before.sequence(),
+                before.invocationId(),
+                before.tool(),
+                before.argsHmac(),
+                before.decision().name(),
+                before.reason(),
+                before.basis().name(),
+                "{read-only}",
+                null,
+                null,
+                before.principal(),
+                before.conversationId(),
+                OffsetDateTime.ofInstant(before.timestamp(), ZoneOffset.UTC),
+                before.previousHash(),
+                before.hash(),
+                before.signature());
+
+        JdbcAuditSink.createSchema(old);
+        JdbcAuditSink upgraded = new JdbcAuditSink(old);
+        Receipt after = chain.append(
+                invocation("crm_find_customer", "alice", "c1"), allow("crm-reads"), null, null, List.of("no-cards"));
+        upgraded.append(after);
+
+        List<Receipt> stored = upgraded.stream(chain.streamId());
+        assertThat(stored).containsExactly(before, after);
+        assertThat(stored.getLast().redactions()).containsExactly("no-cards");
+        assertThat(verifier().verify(stored)).isEqualTo(new VerificationResult.Valid(2));
+    }
+
+    @Test
+    void storesTheRedactionsOfAReceipt() {
+        ReceiptChain chain = newChain();
+        Receipt receipt = chain.append(
+                invocation("crm_find_customer", "alice", "c1"),
+                allow("crm-reads"),
+                null,
+                null,
+                List.of("no-cards", "no-contact"));
+
+        sink.append(receipt);
+
+        assertThat(sql.queryForObject(
+                        "SELECT array_to_string(redactions, ',') FROM countersign_receipt WHERE stream_id = ?",
+                        String.class,
+                        chain.streamId()))
+                .isEqualTo("no-cards,no-contact");
+        assertThat(sink.stream(chain.streamId())).containsExactly(receipt);
     }
 }

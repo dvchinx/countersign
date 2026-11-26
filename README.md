@@ -100,7 +100,8 @@ On startup you'll see one line telling you Countersign is active and which defau
 1. **Build** a `ToolInvocation`: tool name, parsed arguments, principal, conversation id.
 2. **Evaluate** it against your policies, in priority order. The first match wins; if nothing matches, the default (`deny`) applies. On `REQUIRE_APPROVAL`, wait for a human until the timeout.
 3. **Record** a receipt: the decision, the matched policies, who approved it, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
-4. **Apply** the decision: run the tool if it was allowed or approved, otherwise return a structured refusal.
+4. **Apply** the decision: run the tool if it was allowed or approved, and pass its result through every redaction
+   rule that matches before the model sees it; otherwise return a structured refusal.
 
 The receipt is signed before the tool runs: if signing fails, the tool does not run.
 5. **Publish** it to your `AuditSink`, along with Micrometer metrics and observations.
@@ -126,8 +127,10 @@ content filter, not instead of one.
 
 ## Features
 
-- **Three decisions:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`. Redaction of arguments and results is planned
-  ([ADR 0015](docs/adr/0015-redaction.md)).
+- **Three decisions:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`.
+- **Redaction of results:** mask card numbers, emails or any field before a tool's result reaches the model. Every
+  matching rule applies, even to approved calls ([ADR 0015](docs/adr/0015-redaction.md)). Redacting arguments is
+  planned.
 - **Declarative policies:** tool globs (`db_*`), priorities, and conditions written in a sandboxed SpEL
   (`SimpleEvaluationContext`: no type references, no bean access, no arbitrary method calls).
 - **Annotations:** `@RequiresApproval` on your `@Tool` methods. `@ToolPolicy(id = "...")` is planned.
@@ -138,7 +141,8 @@ content filter, not instead of one.
   `java.security`, plus a verification utility that detects any edited or deleted receipt.
 - **Privacy by default:** receipts store a keyed hash (HMAC) of the arguments, so values cannot be recovered by guessing. Raw values are never stored.
 - **Audit sinks:** in-memory and PostgreSQL (append-only) out of the box.
-- **Observability:** `countersign.decisions`, `countersign.evaluation` and `countersign.audit.failures` via Micrometer,
+- **Observability:** `countersign.decisions`, `countersign.evaluation`, `countersign.redactions` and
+  `countersign.audit.failures` via Micrometer,
   and the decision and receipt id on each tool call's trace span.
 - **Test helpers:** `countersign-test` lets you assert in your own tests that your agent was blocked.
 
@@ -181,6 +185,14 @@ All properties live under `countersign.*`. Only `policies` is needed to get star
 | `countersign.policies[n].decision` | | `allow`, `deny` or `require-approval`. |
 | `countersign.policies[n].reason` | generic | Shown to the model (deny) or the approver (require-approval). |
 | `countersign.policies[n].priority` | `0` | Lower runs first; ties keep the order listed. |
+| `countersign.redactors.<name>.pattern` | | Regular expression replaced in string values, and in numbers whose digits match. |
+| `countersign.redactors.<name>.fields` | | Keys whose values are replaced, at any depth, ignoring case. Set `pattern` or `fields`. |
+| `countersign.redactors.<name>.replacement` | `[REDACTED]` | Literal replacement text. |
+| `countersign.redactions[n].id` | | Unique id (shared with policy ids), recorded in receipts. |
+| `countersign.redactions[n].tools` | | Tool name globs. |
+| `countersign.redactions[n].when` | always | Sandboxed SpEL over the arguments, as in policies. |
+| `countersign.redactions[n].target` | | `result`. |
+| `countersign.redactions[n].redactors` | | Redactors to apply, in order: keys of `countersign.redactors` or `Redactor` bean names. |
 | `countersign.receipts.signing-key` | generated | Ed25519 private key, PKCS#8, Base64. |
 | `countersign.receipts.args-hmac-key` | generated | 32+ random bytes, Base64, for the keyed hash of arguments. |
 | `countersign.receipts.stream-id` | app name + random | Receipt chain id for this instance. |
@@ -190,8 +202,8 @@ All properties live under `countersign.*`. Only `policies` is needed to get star
 | `countersign.approval.timeout` | `2m` | How long a call waits for a human answer before it is denied. |
 | `countersign.annotation-packages` | | Extra packages scanned for `@RequiresApproval`; your application's packages are always scanned. |
 
-A broken policy (missing tool, bad SpEL, duplicate id) stops the application at startup with a message that names
-the property. A typo never leaves a tool silently unguarded.
+A broken policy or redaction rule (missing tool, bad SpEL, duplicate id, unknown redactor, invalid pattern) stops the
+application at startup with a message that names the property. A typo never leaves a tool silently unguarded.
 
 **Tool names.** OpenAI and Anthropic only accept tool names made of letters, digits, `_` and `-` (up to 64
 characters), so name a tool `payments_transfer`, not `payments.transfer`. Countersign accepts any name, including the
@@ -225,7 +237,12 @@ used automatically, and the `countersign_receipt` table is created at startup if
 
 The table only accepts inserts: triggers reject `UPDATE`, `DELETE` and `TRUNCATE`. If you manage the schema with
 Flyway or Liquibase, copy `schema-postgresql.sql` from the jar and set
-`countersign.audit.jdbc.initialize-schema=false`. To check a stream later:
+`countersign.audit.jdbc.initialize-schema=false`. Upgrading from 0.1.0 adds a `redactions` column: with
+`initialize-schema=true` it is added at startup; otherwise add this migration first, or every insert fails:
+
+```sql
+ALTER TABLE countersign_receipt ADD COLUMN IF NOT EXISTS redactions text[] NOT NULL DEFAULT '{}';
+``` To check a stream later:
 
 ```java
 ReceiptVerifier verifier = ReceiptVerifier.fromX509Base64(publicKey);
@@ -241,7 +258,8 @@ way, and `Policy` beans are added to the configured policies.
 |---|---|---|
 | `countersign.decisions` | `tool`, `decision`, `policy`, `basis`, `outcome`, `approval` | Alert on `outcome=refuse`; see approvals that time out. |
 | `countersign.evaluation` | `tool` | Watch policy evaluation time (waiting for a human is not included). |
-| `countersign.audit.failures` | `tool`, `stage` | Catch receipts that were not signed (`receipt`) or not stored (`sink`). |
+| `countersign.redactions` | `tool`, `rule`, `target` | See which redaction rules apply to which tools. |
+| `countersign.audit.failures` | `tool`, `stage` | Catch receipts that were not signed (`receipt`) or not stored (`sink`), and results withheld because they could not be redacted (`redaction`). |
 
 Traces show `countersign.decision`, `countersign.outcome`, `countersign.policy` and `countersign.receipt` on Spring
 AI's `spring.ai.tool` span. To react to decisions yourself, define a `DecisionListener` bean: it gets every decision,
@@ -270,6 +288,41 @@ approvals.reject(invocationId, currentUser(), "Unknown payee");
 ```
 
 The agent's request waits while the approval is pending, so keep the timeout below any HTTP timeout in front of it.
+
+**Redacting results.** A call can be allowed and still return data the model should not see, such as a card number
+or a customer's email. A redaction rule changes the result before the model gets it. Unlike policies, every rule that
+matches a call that runs applies, whatever decided access: an approved call is redacted too, and no `allow` listed
+earlier can skip a rule.
+
+```yaml
+countersign:
+  policies:
+    - id: crm-reads
+      tools: ["crm_*"]
+      decision: allow
+  redactors:
+    card-number:
+      pattern: "\\b\\d(?:[ -]?\\d){12,18}\\b"   # in strings, and in numbers whose digits match
+      replacement: "[CARD]"
+    contact:
+      fields: [email, phone]                    # the value under these keys, at any depth
+  redactions:
+    - id: no-cards-to-the-model
+      tools: ["crm_*"]
+      target: result
+      redactors: [card-number, contact]
+```
+
+The model gets `{"name":"Ana Pérez","email":"[REDACTED]","phone":"[REDACTED]","card":"[CARD]"}`, and the receipt
+lists `"redactions": ["no-cards-to-the-model"]`. A JSON result is redacted as a tree, so `fields` sees its keys; any
+other text is redacted as one string. For your own rules, define a `Redactor` bean and name it in `redactors`;
+`Redactor.strings(text -> ...)` is the shortest way to write one. Keep patterns simple: they run on data the model
+controls, and the call waits for them.
+
+If a redactor fails, the tool has already run, so its result is withheld: the model gets `"status":"WITHHELD"`, and
+`countersign.audit.failures` counts it with `stage=redaction`. Redaction only controls what the model sees; when a
+tool must not run at all, use `deny` or `require-approval`. Redacting arguments is planned; `target: args` stops the
+application at startup for now.
 
 **Who the agent acts for.** Each receipt records the principal, and policies can test it (`#principal == 'alice'`).
 With Spring Security in the application, it is the signed-in user, with no code; anonymous users count as unknown. To

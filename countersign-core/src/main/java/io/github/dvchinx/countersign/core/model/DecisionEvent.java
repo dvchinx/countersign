@@ -1,6 +1,7 @@
 package io.github.dvchinx.countersign.core.model;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -24,6 +25,8 @@ import org.jspecify.annotations.Nullable;
  * @param receipt the receipt recorded for the call, or {@code null} if it could not be created (the call is then
  *     refused)
  * @param auditFailed whether storing the receipt in the audit sink failed
+ * @param redactions the redaction rules that apply to the call, in the order they are applied; empty when none
+ *     applies or the call does not run
  */
 public record DecisionEvent(
         String tool,
@@ -34,13 +37,14 @@ public record DecisionEvent(
         boolean proceeds,
         Duration evaluationTime,
         @Nullable Receipt receipt,
-        boolean auditFailed) {
+        boolean auditFailed,
+        List<Redaction> redactions) {
 
     /**
      * Creates an event.
      *
      * @throws IllegalArgumentException if the call proceeds without a receipt, an audit failure is reported without
-     *     a receipt, or the evaluation time is negative
+     *     a receipt, the evaluation time is negative, or redactions are reported for a call that does not run
      */
     public DecisionEvent {
         Objects.requireNonNull(tool, "tool");
@@ -56,6 +60,38 @@ public record DecisionEvent(
         if (receipt == null && auditFailed) {
             throw new IllegalArgumentException("only a recorded receipt can fail to be stored");
         }
+        redactions = List.copyOf(redactions);
+        if (!proceeds && !redactions.isEmpty()) {
+            throw new IllegalArgumentException("redactions apply only to a call that runs");
+        }
+    }
+
+    /**
+     * Creates an event with no redactions, as 0.1.0 did.
+     *
+     * @param tool the tool's name
+     * @param decision what the policies decided
+     * @param basis why the decision was reached
+     * @param policyId the policy that decided, or {@code null}
+     * @param approval what happened to the approval, or {@code null}
+     * @param proceeds whether the tool runs
+     * @param evaluationTime time spent evaluating policies
+     * @param receipt the receipt recorded for the call, or {@code null}
+     * @param auditFailed whether storing the receipt in the audit sink failed
+     * @throws IllegalArgumentException if the call proceeds without a receipt, an audit failure is reported without
+     *     a receipt, or the evaluation time is negative
+     */
+    public DecisionEvent(
+            String tool,
+            Decision.Type decision,
+            EvaluationResult.Basis basis,
+            @Nullable String policyId,
+            @Nullable ApprovalOutcome approval,
+            boolean proceeds,
+            Duration evaluationTime,
+            @Nullable Receipt receipt,
+            boolean auditFailed) {
+        this(tool, decision, basis, policyId, approval, proceeds, evaluationTime, receipt, auditFailed, List.of());
     }
 
     /**

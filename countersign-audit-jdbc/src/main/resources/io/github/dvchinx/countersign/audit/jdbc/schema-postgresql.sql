@@ -24,8 +24,14 @@ CREATE TABLE IF NOT EXISTS countersign_receipt (
     previous_hash    text        NOT NULL,
     hash             text        NOT NULL,
     signature        text        NOT NULL,
+    redactions       text[]      NOT NULL DEFAULT '{}',
     PRIMARY KEY (stream_id, sequence_number)
 );
+
+-- Added after 0.1.0 (ADR 0015): the redaction rules that applied to each call. A table created by 0.1.0 gets the column
+-- here; rows written before it read back with no redactions and keep verifying. If you manage the schema with Flyway
+-- or Liquibase, add this statement as a migration before upgrading.
+ALTER TABLE countersign_receipt ADD COLUMN IF NOT EXISTS redactions text[] NOT NULL DEFAULT '{}';
 
 -- Append-only. The signatures and the hash chain already make any change detectable; these triggers stop accidental
 -- changes from happening at all. For a stronger guarantee, grant the application role only INSERT and SELECT on

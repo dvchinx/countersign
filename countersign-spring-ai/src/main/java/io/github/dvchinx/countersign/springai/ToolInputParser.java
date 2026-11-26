@@ -1,16 +1,6 @@
 package io.github.dvchinx.countersign.springai;
 
-import io.github.dvchinx.countersign.core.model.JsonArray;
-import io.github.dvchinx.countersign.core.model.JsonBoolean;
-import io.github.dvchinx.countersign.core.model.JsonNull;
-import io.github.dvchinx.countersign.core.model.JsonNumber;
 import io.github.dvchinx.countersign.core.model.JsonObject;
-import io.github.dvchinx.countersign.core.model.JsonString;
-import io.github.dvchinx.countersign.core.model.JsonValue;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.StreamReadFeature;
@@ -55,49 +45,9 @@ final class ToolInputParser {
         }
         try {
             JsonNode root = MAPPER.readTree(input);
-            return root != null && root.isObject() ? (JsonObject) convert(root) : null;
-        } catch (JacksonException | UnsupportedNodeException e) {
+            return root != null && root.isObject() ? (JsonObject) CoreJson.fromJackson(root) : null;
+        } catch (JacksonException | CoreJson.UnsupportedNodeException e) {
             return null;
-        }
-    }
-
-    private static JsonValue convert(JsonNode node) {
-        if (node.isObject()) {
-            Map<String, JsonValue> members = new LinkedHashMap<>();
-            for (Map.Entry<String, JsonNode> member : node.properties()) {
-                members.put(member.getKey(), convert(member.getValue()));
-            }
-            return new JsonObject(members);
-        }
-        if (node.isArray()) {
-            List<JsonValue> elements = new ArrayList<>(node.size());
-            for (JsonNode element : node.values()) {
-                elements.add(convert(element));
-            }
-            return new JsonArray(elements);
-        }
-        if (node.isString()) {
-            return JsonString.of(node.stringValue());
-        }
-        if (node.isNumber()) {
-            return JsonNumber.of(node.decimalValue());
-        }
-        if (node.isBoolean()) {
-            return JsonBoolean.of(node.booleanValue());
-        }
-        if (node.isNull()) {
-            return JsonNull.INSTANCE;
-        }
-        throw new UnsupportedNodeException();
-    }
-
-    /** A node type plain JSON text cannot produce (binary, POJO); treated as invalid input. */
-    private static final class UnsupportedNodeException extends RuntimeException {
-
-        private static final long serialVersionUID = 1L;
-
-        UnsupportedNodeException() {
-            super(null, null, false, false);
         }
     }
 }
