@@ -22,8 +22,9 @@ import java.util.regex.Pattern;
  * <b>every</b> rule that matches a call that runs applies to it, whatever decided access. So an approved call still
  * gets its result redacted, and no {@code allow} listed earlier can drop a redaction.
  *
- * <p>Only {@link Redaction.Target#RESULT} is supported for now; a rule that targets the arguments is rejected when it
- * is built, so it can never be accepted and then silently not applied.
+ * <p>A rule that targets {@link Redaction.Target#ARGS} changes what the tool receives, not what the policies, the
+ * approver or the receipt's {@code argsHmac} see: they keep the arguments the model proposed. Its redactors must
+ * return a JSON object. One that targets {@link Redaction.Target#RESULT} changes what the model gets back.
  *
  * @param id unique id, shared with policy ids and recorded in receipts; letters, digits, {@code .}, {@code _} and
  *     {@code -}
@@ -44,8 +45,7 @@ public record RedactionRule(
     /**
      * Creates a rule.
      *
-     * @throws InvalidPolicyException if the id is not valid, no tool pattern, target or redactor is given, or a
-     *     target is not supported yet
+     * @throws InvalidPolicyException if the id is not valid, or no tool pattern, target or redactor is given
      */
     public RedactionRule {
         Objects.requireNonNull(id, "id");
@@ -60,13 +60,9 @@ public record RedactionRule(
         Objects.requireNonNull(condition, "condition");
         Objects.requireNonNull(targets, "targets");
         if (targets.isEmpty()) {
-            throw new InvalidPolicyException("Redaction rule '" + id + "' needs a target (result)");
+            throw new InvalidPolicyException("Redaction rule '" + id + "' needs a target (args, result or both)");
         }
         targets = Collections.unmodifiableSet(EnumSet.copyOf(targets));
-        if (targets.contains(Redaction.Target.ARGS)) {
-            throw new InvalidPolicyException("Redaction rule '" + id + "': redacting arguments is not supported yet;"
-                    + " only 'result' can be redacted (ADR 0015)");
-        }
         redactors = List.copyOf(redactors);
         if (redactors.isEmpty()) {
             throw new InvalidPolicyException("Redaction rule '" + id + "' needs at least one redactor");

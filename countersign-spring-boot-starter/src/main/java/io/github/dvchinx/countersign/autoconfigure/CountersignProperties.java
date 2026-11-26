@@ -287,7 +287,10 @@ public class CountersignProperties {
          */
         private @Nullable String when;
 
-        /** What to redact: 'result'. Redacting arguments is not supported yet. */
+        /**
+         * What to redact: 'args' (what the tool receives; the receipt keeps the hash of what the model proposed),
+         * 'result' (what the model gets back), or both ('args, result').
+         */
         private Set<Redaction.Target> target = EnumSet.noneOf(Redaction.Target.class);
 
         /** Names of the redactors to apply, in order: keys of countersign.redactors, or Redactor bean names. */

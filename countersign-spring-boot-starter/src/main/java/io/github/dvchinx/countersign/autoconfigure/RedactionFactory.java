@@ -80,7 +80,7 @@ final class RedactionFactory {
             throw new InvalidPolicyException("'id' is required");
         }
         if (properties.getTarget().isEmpty()) {
-            throw new InvalidPolicyException("redaction rule '" + id + "' needs a 'target' (result)");
+            throw new InvalidPolicyException("redaction rule '" + id + "' needs a 'target' (args, result or both)");
         }
         if (properties.getRedactors().isEmpty()) {
             throw new InvalidPolicyException("redaction rule '" + id + "' needs at least one entry in 'redactors'");

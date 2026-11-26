@@ -94,17 +94,17 @@ On startup you'll see one line telling you Countersign is active and which defau
 
 <p align="center">
   <img src="docs/images/tool-call-flow.drawio.svg" width="860"
-       alt="Tool call flow: the agent proposes a call, GuardedToolCallback asks the PolicyEngine, which returns ALLOW, REDACT, REQUIRE APPROVAL or DENY. Allowed, redacted and approved calls run the tool; denied, rejected or timed-out calls return a structured refusal. Every path produces a signed receipt sent to the AuditSink and Micrometer.">
+       alt="Tool call flow: the agent proposes a call, GuardedToolCallback asks the PolicyEngine, which returns ALLOW, REQUIRE APPROVAL or DENY. Every decision, with the human's answer when approval was needed, produces a signed receipt before the tool runs, sent to the AuditSink and Micrometer. Allowed and approved calls pass their arguments through every matching redaction rule, run the tool, and pass its result through every matching rule; denied, rejected or timed-out calls get a structured refusal. Either one goes back to the model. A note says that redaction is not a decision: every matching rule applies to every call that runs, approved calls included.">
 </p>
 
 1. **Build** a `ToolInvocation`: tool name, parsed arguments, principal, conversation id.
 2. **Evaluate** it against your policies, in priority order. The first match wins; if nothing matches, the default (`deny`) applies. On `REQUIRE_APPROVAL`, wait for a human until the timeout.
-3. **Record** a receipt: the decision, the matched policies, who approved it, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
-4. **Apply** the decision: run the tool if it was allowed or approved, and pass its result through every redaction
-   rule that matches before the model sees it; otherwise return a structured refusal.
+3. **Record** a receipt: the decision, the matched policies, who approved it, the redaction rules that apply, a keyed hash (HMAC-SHA256) of the arguments (never the raw values), the previous receipt's hash, and an Ed25519 signature.
+4. **Publish** it to your `AuditSink`, along with Micrometer metrics and observations.
+5. **Apply** the decision: run the tool if it was allowed or approved, with its arguments and its result passed
+   through every redaction rule that matches; otherwise return a structured refusal.
 
 The receipt is signed before the tool runs: if signing fails, the tool does not run.
-5. **Publish** it to your `AuditSink`, along with Micrometer metrics and observations.
 
 Enforcement happens **where the tool runs**, not in the list of tools sent to the model. A tool the
 model was never offered, or one it was tricked into calling, still has to pass the policy engine.
@@ -128,9 +128,9 @@ content filter, not instead of one.
 ## Features
 
 - **Three decisions:** `ALLOW`, `DENY`, `REQUIRE_APPROVAL`.
-- **Redaction of results:** mask card numbers, emails or any field before a tool's result reaches the model. Every
-  matching rule applies, even to approved calls ([ADR 0015](docs/adr/0015-redaction.md)). Redacting arguments is
-  planned.
+- **Redaction:** mask card numbers, emails or any field in a tool's result before it reaches the model, or in its
+  arguments before they reach the tool. Every matching rule applies, even to approved calls
+  ([ADR 0015](docs/adr/0015-redaction.md)).
 - **Declarative policies:** tool globs (`db_*`), priorities, and conditions written in a sandboxed SpEL
   (`SimpleEvaluationContext`: no type references, no bean access, no arbitrary method calls).
 - **Annotations:** `@RequiresApproval` on your `@Tool` methods. `@ToolPolicy(id = "...")` is planned.
@@ -191,7 +191,7 @@ All properties live under `countersign.*`. Only `policies` is needed to get star
 | `countersign.redactions[n].id` | | Unique id (shared with policy ids), recorded in receipts. |
 | `countersign.redactions[n].tools` | | Tool name globs. |
 | `countersign.redactions[n].when` | always | Sandboxed SpEL over the arguments, as in policies. |
-| `countersign.redactions[n].target` | | `result`. |
+| `countersign.redactions[n].target` | | `args` (what the tool receives), `result` (what the model gets back), or `args, result`. |
 | `countersign.redactions[n].redactors` | | Redactors to apply, in order: keys of `countersign.redactors` or `Redactor` bean names. |
 | `countersign.receipts.signing-key` | generated | Ed25519 private key, PKCS#8, Base64. |
 | `countersign.receipts.args-hmac-key` | generated | 32+ random bytes, Base64, for the keyed hash of arguments. |
@@ -289,10 +289,11 @@ approvals.reject(invocationId, currentUser(), "Unknown payee");
 
 The agent's request waits while the approval is pending, so keep the timeout below any HTTP timeout in front of it.
 
-**Redacting results.** A call can be allowed and still return data the model should not see, such as a card number
-or a customer's email. A redaction rule changes the result before the model gets it. Unlike policies, every rule that
-matches a call that runs applies, whatever decided access: an approved call is redacted too, and no `allow` listed
-earlier can skip a rule.
+**Redaction.** A call can be allowed and still carry data that should not go where it is going. A redaction rule
+changes the **result** before the model gets it, such as a card number from a CRM, or the **arguments** before the tool
+gets them, such as a customer's email sent to an outside search service. Unlike policies, every rule that matches a
+call that runs applies, whatever decided access: an approved call is redacted too, and no `allow` listed earlier can
+skip a rule.
 
 ```yaml
 countersign:
@@ -300,29 +301,45 @@ countersign:
     - id: crm-reads
       tools: ["crm_*"]
       decision: allow
+    - id: searches
+      tools: ["web_search"]
+      decision: allow
   redactors:
     card-number:
       pattern: "\\b\\d(?:[ -]?\\d){12,18}\\b"   # in strings, and in numbers whose digits match
       replacement: "[CARD]"
+    email:
+      pattern: "[\\w.+-]+@[\\w-]+(?:\\.[\\w-]+)+"
+      replacement: "[EMAIL]"
     contact:
       fields: [email, phone]                    # the value under these keys, at any depth
   redactions:
     - id: no-cards-to-the-model
       tools: ["crm_*"]
-      target: result
+      target: result                            # args, result, or both: "args, result"
       redactors: [card-number, contact]
+    - id: no-emails-to-search
+      tools: ["web_search"]
+      target: args
+      redactors: [email]
 ```
 
-The model gets `{"name":"Ana Pérez","email":"[REDACTED]","phone":"[REDACTED]","card":"[CARD]"}`, and the receipt
-lists `"redactions": ["no-cards-to-the-model"]`. A JSON result is redacted as a tree, so `fields` sees its keys; any
-other text is redacted as one string. For your own rules, define a `Redactor` bean and name it in `redactors`;
-`Redactor.strings(text -> ...)` is the shortest way to write one. Keep patterns simple: they run on data the model
-controls, and the call waits for them.
+From `crm_find_customer`, the model gets `{"name":"Ana Pérez","email":"[REDACTED]","phone":"[REDACTED]","card":"[CARD]"}`.
+When the model asks `web_search` for `orders of ana@example.com`, the tool receives `orders of [EMAIL]`. Each receipt
+lists the rules that applied, such as `"redactions": ["no-cards-to-the-model"]`. For your own rules, define a
+`Redactor` bean and name it in `redactors`; `Redactor.strings(text -> ...)` is the shortest way to write one. Keep
+patterns simple: they run on data the model controls, and the call waits for them.
 
-If a redactor fails, the tool has already run, so its result is withheld: the model gets `"status":"WITHHELD"`, and
-`countersign.audit.failures` counts it with `stage=redaction`. Redaction only controls what the model sees; when a
-tool must not run at all, use `deny` or `require-approval`. Redacting arguments is planned; `target: args` stops the
-application at startup for now.
+*Arguments* are redacted before anyone is asked to approve the call. The policies, the approver and the receipt's
+argument hash keep what the model proposed, and redactors are deterministic, so whoever holds the original arguments
+can recompute what the tool received. The tool gets the redacted arguments as compact JSON, or the model's input
+unchanged when no rule changed anything. If an argument redactor fails, the call is refused and recorded, and the
+tool never runs. Check that the tool still accepts what it gets: a number replaced with `[REDACTED]` becomes a string.
+
+*Results* that are JSON are redacted as a tree, so `fields` sees their keys; any other text is redacted as one string.
+If a result redactor fails, the tool has already run, so its result is withheld: the model gets
+`"status":"WITHHELD"`, and `countersign.audit.failures` counts it with `stage=redaction`. Redaction only controls what
+data moves; when a tool must not run at all, use `deny` or `require-approval`.
 
 **Who the agent acts for.** Each receipt records the principal, and policies can test it (`#principal == 'alice'`).
 With Spring Security in the application, it is the signed-in user, with no code; anonymous users count as unknown. To

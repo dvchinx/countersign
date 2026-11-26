@@ -26,7 +26,7 @@ import java.util.Objects;
  *       tagged {@code tool}. Without strict auditing a stored-receipt failure lets the call go on, so this counter is
  *       how it gets noticed.
  *   <li>{@value #REDACTIONS} (counter): one per redaction rule and target applied to a call that runs, tagged
- *       {@code tool}, {@code rule} and {@code target} ({@code result}). Counted when the call is decided, before the
+ *       {@code tool}, {@code rule} and {@code target} ({@code args} or {@code result}). Counted when the call is decided, before the
  *       tool runs; it says that a rule applied, not that its redactors found something to change.
  * </ul>
  *

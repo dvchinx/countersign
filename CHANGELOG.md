@@ -30,7 +30,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `RedactionRule` beans are added to the configured rules. A broken rule (unknown redactor, invalid pattern, missing
   target, an id already used by a policy) stops the application at startup and names the property. A rule whose
   condition throws refuses the call; a redactor that throws withholds the result (`"status":"WITHHELD"`), because the
-  tool already ran. Redacting arguments is planned; `target: args` is rejected at startup for now.
+  tool already ran.
+- Redaction of tool arguments: a rule with `target: args` (or `args, result`) changes what the tool receives, for
+  example to keep a customer's email from an outside search service. Argument redactors run before anyone is asked to
+  approve the call; the policies, the approver and the receipt's `argsHmac` keep the arguments the model proposed. The
+  tool gets the redacted arguments as compact JSON, or the model's input byte for byte when no rule changed it. A
+  redactor that throws, or does not return a JSON object, refuses the call, which is recorded as
+  `EVALUATION_FAILED` with the rule's id; the tool never runs. `Verdict.Proceed` carries the arguments in
+  `redactedArguments()`.
 - Receipts record the redaction rules that applied, in a new `redactions` field. It is left out of the hashed JSON
   when empty, so receipts from 0.1.0 keep verifying with no version field; a test pins two receipts signed by 0.1.0.
 - `countersign.redactions` counter (tags `tool`, `rule`, `target`) and `stage=redaction` in
@@ -66,6 +73,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `GuardedToolCallingManager` is no longer `final` (its methods are), so that its Spring AI 2.1 variant can extend it.
 
 - The READMEs list the steps of a tool call in the order they happen: the receipt is recorded before the tool runs.
+- The tool call diagram shows three decisions plus result redaction, and the receipt recorded and published before
+  the tool runs, with its HMAC of the arguments. Its alt text and the steps under it match.
 - The release build waits until the Central Portal validates the bundle instead of until it is published, so slow
   publishing no longer fails the release workflow after a successful upload.
 

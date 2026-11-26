@@ -63,11 +63,15 @@ class RedactionRuleTest {
     }
 
     @Test
-    void rejectsArgumentRedactionInsteadOfIgnoringIt() {
-        assertThatThrownBy(() -> rule("no-emails-to-search")
+    void canTargetTheArgumentsTheResultOrBoth() {
+        assertThat(rule("both").target(Redaction.Target.ARGS).build().targets())
+                .containsExactly(Redaction.Target.ARGS, Redaction.Target.RESULT);
+        assertThat(RedactionRule.builder("args-only")
+                        .tools("web_search")
                         .target(Redaction.Target.ARGS)
-                        .build())
-                .isInstanceOf(InvalidPolicyException.class)
-                .hasMessageContaining("redacting arguments is not supported yet");
+                        .redactors(NOTHING)
+                        .build()
+                        .redaction())
+                .isEqualTo(new Redaction("args-only", Set.of(Redaction.Target.ARGS)));
     }
 }

@@ -16,6 +16,8 @@ import io.github.dvchinx.countersign.core.spi.Redactor;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,13 +52,25 @@ class RedactionAutoConfigurationTest {
         }
     }
 
+    /** A search tool that sends its query to an outside service. */
+    static class SearchTools {
+
+        final List<String> queries = new ArrayList<>();
+
+        @Tool(name = "web_search", description = "Search the web")
+        String search(String query) {
+            queries.add(query);
+            return "3 results";
+        }
+    }
+
     private final ApplicationContextRunner runner =
             new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(CountersignAutoConfiguration.class));
 
     /** The redaction example from README.md, read from the file so the two cannot drift apart. */
     private static String readmeRedactionYaml() throws IOException {
         String readme = Files.readString(Path.of("..", "README.md"));
-        int section = readme.indexOf("**Redacting results.**");
+        int section = readme.indexOf("**Redaction.**");
         int start = readme.indexOf("```yaml\n", section) + "```yaml\n".length();
         return readme.substring(start, readme.indexOf("```", start));
     }
@@ -117,7 +131,35 @@ class RedactionAutoConfigurationTest {
                                     .getFirst()
                                     .redactions())
                             .containsExactly("no-cards-to-the-model");
-                    assertThat(output).contains("1 redaction rule");
+                    assertThat(output).contains("2 redaction rules");
+                });
+    }
+
+    @Test
+    void theReadmeExampleKeepsTheEmailFromTheSearchService() {
+        SearchTools search = new SearchTools();
+        ScriptedChatModel model = new ScriptedChatModel("web_search", "{\"query\":\"orders of ana@example.com\"}");
+
+        withReadmeExample(new ApplicationContextRunner())
+                .withConfiguration(AutoConfigurations.of(
+                        ToolCallingAutoConfiguration.class,
+                        ChatClientAutoConfiguration.class,
+                        CountersignAutoConfiguration.class))
+                .withBean(ChatModel.class, () -> model)
+                .run(context -> {
+                    context.getBean(ChatClient.Builder.class)
+                            .build()
+                            .prompt("search")
+                            .tools(search)
+                            .call()
+                            .content();
+
+                    assertThat(search.queries).containsExactly("orders of [EMAIL]");
+                    assertThat(context.getBean(InMemoryAuditSink.class)
+                                    .receipts()
+                                    .getFirst()
+                                    .redactions())
+                            .containsExactly("no-emails-to-search");
                 });
     }
 
@@ -182,16 +224,17 @@ class RedactionAutoConfigurationTest {
     }
 
     @Test
-    void refusesToStartWithArgumentRedactionRatherThanIgnoringIt() {
+    void bindsATargetListToBothTargets() {
         runner.withPropertyValues(
                         "countersign.redactors.contact.fields=email",
-                        "countersign.redactions[0].id=no-emails-to-search",
-                        "countersign.redactions[0].tools=web_search",
-                        "countersign.redactions[0].target=args",
+                        "countersign.redactions[0].id=no-contact",
+                        "countersign.redactions[0].tools=crm_*",
+                        "countersign.redactions[0].target=args, result",
                         "countersign.redactions[0].redactors=contact")
-                .run(context -> assertThat(policyError(context.getStartupFailure()))
-                        .hasMessageContaining("countersign.redactions[0]")
-                        .hasMessageContaining("redacting arguments is not supported yet"));
+                .run(context -> assertThat(context.getBean(ToolCallGuard.class).redactionRules())
+                        .singleElement()
+                        .satisfies(rule -> assertThat(rule.targets())
+                                .containsExactly(Redaction.Target.ARGS, Redaction.Target.RESULT)));
     }
 
     @Test
@@ -228,6 +271,6 @@ class RedactionAutoConfigurationTest {
                         new InvalidPolicyException("countersign.redactions[0]: unknown redactor 'card-numbr'")));
 
         assertThat(analysis.getDescription()).contains("redaction rules", "countersign.redactions[0]");
-        assertThat(analysis.getAction()).contains("countersign.redactors", "target: result");
+        assertThat(analysis.getAction()).contains("countersign.redactors", "'target' (args, result or both)");
     }
 }

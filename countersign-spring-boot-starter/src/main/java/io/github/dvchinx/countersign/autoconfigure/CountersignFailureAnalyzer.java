@@ -19,7 +19,7 @@ class CountersignFailureAnalyzer extends AbstractFailureAnalyzer<CountersignExce
                     "Countersign could not load its redaction rules: " + message,
                     "Fix the property named above. Each entry under countersign.redactors needs either 'pattern' (a"
                             + " valid regular expression that cannot match empty text) or 'fields'. Each rule under"
-                            + " countersign.redactions needs a unique id, at least one tool pattern, 'target: result'"
+                            + " countersign.redactions needs a unique id, at least one tool pattern, a 'target' (args, result or both)"
                             + " and the names of known redactors; 'when' must be a valid SpEL expression.",
                     cause);
         }
