@@ -19,6 +19,7 @@ import io.github.dvchinx.countersign.core.spi.ApprovalGateway;
 import io.github.dvchinx.countersign.core.spi.AuditSink;
 import io.github.dvchinx.countersign.core.spi.DecisionListener;
 import io.github.dvchinx.countersign.core.spi.PrincipalResolver;
+import io.github.dvchinx.countersign.core.spi.Redactor;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -48,9 +49,10 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *   <li>a {@link PrincipalResolver} that throws: refused without a receipt, before any policy is evaluated;
  *   <li>a policy that throws: the engine denies, and the denial is recorded;
- *   <li>a redaction rule whose condition throws: refused and recorded as
+ *   <li>a redaction rule whose condition throws, or that cannot redact the arguments: refused and recorded as
  *       {@link EvaluationResult.Basis#EVALUATION_FAILED} with the rule's id, before anyone is asked to approve. A rule
- *       that cannot be checked might have been needed;
+ *       that cannot be checked might have been needed, and the tool never runs with arguments that were meant to be
+ *       redacted and were not;
  *   <li>arguments that cannot be read: see {@link #refuseInvalidArguments};
  *   <li>an approval that is rejected, times out, or cannot be asked (no gateway, gateway error): refused and recorded
  *       with its {@link ApprovalOutcome};
@@ -60,8 +62,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Redaction is an obligation, not a decision (ADR 0015): every {@link RedactionRule} that matches a call that runs
  * applies to it, whatever decided access. Rules are matched on the arguments the model proposed, the same ones the
- * policies and the approver see, and only when the policies did not deny the call. The receipt lists the rules that
- * apply; {@link Verdict.Proceed#resultRedaction()} carries what the adapter must redact from the result. If that
+ * policies and the approver see, and only when the policies did not deny the call. Rules that target the arguments are
+ * applied right away, so a failure refuses the call before anyone is asked to approve it; the approver, the receipt's
+ * {@code argsHmac} and the policies all keep the arguments the model proposed (ADR 0004, ADR 0015).
+ * {@link Verdict.Proceed#redactedArguments()} carries what the tool must receive instead. The receipt lists the rules
+ * that apply; {@link Verdict.Proceed#resultRedaction()} carries what the adapter must redact from the result. If that
  * fails, the result is withheld, the failure is logged, and every listener's
  * {@link DecisionListener#onResultWithheld} is called.
  *
@@ -167,14 +172,13 @@ public final class ToolCallGuard {
         }
         long start = System.nanoTime();
         EvaluationResult result = engine.evaluate(invocation);
-        List<RedactionRule> redactions = List.of();
+        Redactions redactions = Redactions.NONE;
         if (!(result.decision() instanceof Decision.Deny)) {
             // Before approval: nobody should be asked to approve a call that is refused anyway.
-            Matched matched = matchRedactions(invocation);
-            if (matched.failedRuleId() != null) {
-                result = EvaluationResult.failed(matched.failedRuleId());
-            } else {
-                redactions = matched.rules();
+            redactions = prepareRedactions(invocation);
+            if (redactions.failedRuleId() != null) {
+                result = EvaluationResult.failed(redactions.failedRuleId());
+                redactions = Redactions.NONE;
             }
         }
         Duration evaluationTime = Duration.ofNanos(System.nanoTime() - start);
@@ -189,11 +193,26 @@ public final class ToolCallGuard {
         return decide(invocation, result, null, redactions, evaluationTime);
     }
 
-    /** The redaction rules that apply to a call, or the first one whose condition failed. */
-    private record Matched(
-            List<RedactionRule> rules, @Nullable String failedRuleId) {}
+    /**
+     * The redaction rules that apply to a call and the arguments its tool must receive, or the first rule that failed.
+     *
+     * @param rules the rules that apply, in order
+     * @param redactedArguments the redacted arguments, or {@code null} when no rule changed them
+     * @param failedRuleId the rule whose condition or argument redactors failed, or {@code null}
+     */
+    private record Redactions(
+            List<RedactionRule> rules,
+            @Nullable JsonObject redactedArguments,
+            @Nullable String failedRuleId) {
 
-    private Matched matchRedactions(ToolInvocation invocation) {
+        static final Redactions NONE = new Redactions(List.of(), null, null);
+
+        static Redactions failed(String ruleId) {
+            return new Redactions(List.of(), null, ruleId);
+        }
+    }
+
+    private Redactions prepareRedactions(ToolInvocation invocation) {
         List<RedactionRule> matched = new ArrayList<>();
         for (RedactionRule rule : redactionRules) {
             try {
@@ -201,18 +220,42 @@ public final class ToolCallGuard {
                     matched.add(rule);
                 }
             } catch (RuntimeException e) {
-                // The exception type is safe to log; the message might quote argument values, so it goes to DEBUG.
-                LOG.log(
-                        System.Logger.Level.WARNING,
-                        "Redaction rule ''{0}'' failed on tool ''{1}'' ({2}); refusing the call",
-                        rule.id(),
-                        invocation.toolName(),
-                        e.getClass().getName());
-                LOG.log(System.Logger.Level.DEBUG, "Redaction rule '" + rule.id() + "' failure details", e);
-                return new Matched(List.of(), rule.id());
+                logRedactionFailure(rule, invocation, "failed on", e);
+                return Redactions.failed(rule.id());
             }
         }
-        return new Matched(matched, null);
+        JsonObject arguments = invocation.arguments();
+        for (RedactionRule rule : matched) {
+            if (!rule.targets().contains(Redaction.Target.ARGS)) {
+                continue;
+            }
+            try {
+                for (Redactor redactor : rule.redactors()) {
+                    if (!(redactor.redact(arguments) instanceof JsonObject redacted)) {
+                        throw new IllegalStateException("a redactor did not return a JSON object for the arguments");
+                    }
+                    arguments = redacted;
+                }
+            } catch (RuntimeException e) {
+                logRedactionFailure(rule, invocation, "could not redact the arguments of", e);
+                return Redactions.failed(rule.id());
+            }
+        }
+        // Unchanged arguments go to the tool exactly as the model wrote them.
+        return new Redactions(matched, arguments.equals(invocation.arguments()) ? null : arguments, null);
+    }
+
+    private static void logRedactionFailure(
+            RedactionRule rule, ToolInvocation invocation, String what, RuntimeException e) {
+        // The exception type is safe to log; the message might quote argument values, so it goes to DEBUG.
+        LOG.log(
+                System.Logger.Level.WARNING,
+                "Redaction rule ''{0}'' {1} tool ''{2}'' ({3}); refusing the call",
+                rule.id(),
+                what,
+                invocation.toolName(),
+                e.getClass().getName());
+        LOG.log(System.Logger.Level.DEBUG, "Redaction rule '" + rule.id() + "' failure details", e);
     }
 
     /**
@@ -258,7 +301,7 @@ public final class ToolCallGuard {
         }
         ToolInvocation invocation =
                 new ToolInvocation(invocationId, toolName, JsonObject.empty(), principal, conversationId, timestamp);
-        return decide(invocation, EvaluationResult.invalidArguments(), null, List.of(), Duration.ZERO);
+        return decide(invocation, EvaluationResult.invalidArguments(), null, Redactions.NONE, Duration.ZERO);
     }
 
     /** Returns the invocation with the resolver's principal when it has none of its own. */
@@ -364,7 +407,7 @@ public final class ToolCallGuard {
             ToolInvocation invocation,
             EvaluationResult result,
             @Nullable Approval approval,
-            List<RedactionRule> redactions,
+            Redactions redactions,
             Duration evaluationTime) {
         boolean runs = switch (result.decision()) {
             case Decision.Allow allow -> true;
@@ -372,7 +415,8 @@ public final class ToolCallGuard {
             case Decision.RequireApproval required ->
                 approval != null && approval.outcome() == ApprovalOutcome.APPROVED;
         };
-        List<RedactionRule> applied = runs ? redactions : List.of();
+        List<RedactionRule> applied = runs ? redactions.rules() : List.of();
+        JsonObject redactedArguments = runs ? redactions.redactedArguments() : null;
         Receipt receipt;
         try {
             receipt = receipts.append(
@@ -425,11 +469,12 @@ public final class ToolCallGuard {
         }
 
         Verdict verdict = switch (result.decision()) {
-            case Decision.Allow allow -> new Verdict.Proceed(receipt, resultRedaction(invocation, receipt, applied));
+            case Decision.Allow allow ->
+                new Verdict.Proceed(receipt, redactedArguments, resultRedaction(invocation, receipt, applied));
             case Decision.Deny deny -> new Verdict.Refuse(Decision.Type.DENY, deny.reason(), receipt);
             case Decision.RequireApproval required ->
                 runs
-                        ? new Verdict.Proceed(receipt, resultRedaction(invocation, receipt, applied))
+                        ? new Verdict.Proceed(receipt, redactedArguments, resultRedaction(invocation, receipt, applied))
                         : new Verdict.Refuse(
                                 Decision.Type.REQUIRE_APPROVAL,
                                 Objects.requireNonNull(approval).message(),

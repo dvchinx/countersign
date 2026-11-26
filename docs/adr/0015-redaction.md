@@ -190,9 +190,15 @@ ids come from configuration. `countersign.decisions` does not change.
 
 ## Implementation notes
 
-- Result redaction shipped first. Argument redaction needs a writer that hands the tool JSON it parses exactly as
-  before, and is left for a follow-up; until then a rule with `target: args` is rejected when it is built, so it can
-  never be accepted and silently not applied.
+- Result redaction shipped first; argument redaction followed in its own change. Until then a rule with
+  `target: args` was rejected when it was built, so it could never be accepted and silently not applied.
+- `ARGS` redactors run right after the rules are matched, before any approval, so a failure refuses the call before
+  anyone is asked. A redactor that does not return a JSON object also refuses it: tool arguments must stay an object.
+- The tool gets the redacted arguments as compact JSON that keeps member order and the exact value of numbers. When
+  the redactors changed nothing, `Verdict.Proceed.redactedArguments()` is `null` and the tool gets the model's input
+  byte for byte. That is safe here, unlike for results, because the input parser rejects duplicate keys, so the text
+  and the tree the redactors saw cannot differ.
+- The approval request keeps the proposed arguments: the approver judges what the model asked for, like the policies.
 - Once a redaction applies, the model gets Countersign's serialization of the redacted tree, never the tool's
   original text, even when nothing changed: a lenient parser keeps only the last of two duplicate keys, so the
   original text could carry a value the redactors never saw.

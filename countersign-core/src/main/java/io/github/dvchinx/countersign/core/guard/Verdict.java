@@ -1,6 +1,7 @@
 package io.github.dvchinx.countersign.core.guard;
 
 import io.github.dvchinx.countersign.core.model.Decision;
+import io.github.dvchinx.countersign.core.model.JsonObject;
 import io.github.dvchinx.countersign.core.model.Receipt;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -14,18 +15,23 @@ import org.jspecify.annotations.Nullable;
 public sealed interface Verdict permits Verdict.Proceed, Verdict.Refuse {
 
     /**
-     * The tool may run. Its result must go through {@link #resultRedaction()} before it reaches the model.
+     * The tool may run, with {@link #redactedArguments()} if they are set, and its result must go through
+     * {@link #resultRedaction()} before it reaches the model.
      *
      * @param receipt the receipt recorded for the call
+     * @param redactedArguments the arguments the tool must receive instead of the ones the model proposed, or
+     *     {@code null} when no redaction rule changed them: then the adapter passes the original input unchanged
      * @param resultRedaction what to redact from the tool's result; {@linkplain ResultRedaction#isEmpty() empty} when
      *     no redaction rule targets it
      */
-    record Proceed(Receipt receipt, ResultRedaction resultRedaction) implements Verdict {
+    record Proceed(Receipt receipt, @Nullable JsonObject redactedArguments, ResultRedaction resultRedaction)
+            implements Verdict {
 
         /**
          * Creates the verdict.
          *
          * @param receipt the receipt recorded for the call
+         * @param redactedArguments the arguments the tool must receive, or {@code null} to pass the original input
          * @param resultRedaction what to redact from the tool's result
          */
         public Proceed {
@@ -34,12 +40,12 @@ public sealed interface Verdict permits Verdict.Proceed, Verdict.Refuse {
         }
 
         /**
-         * Creates the verdict for a call whose result is not redacted, as 0.1.0 did.
+         * Creates the verdict for a call with nothing to redact, as 0.1.0 did.
          *
          * @param receipt the receipt recorded for the call
          */
         public Proceed(Receipt receipt) {
-            this(receipt, ResultRedaction.none());
+            this(receipt, null, ResultRedaction.none());
         }
     }
 
