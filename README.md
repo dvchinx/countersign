@@ -51,8 +51,8 @@ Try it yourself in two minutes, with no API key and no Docker: `./mvnw -pl examp
 
 ## Quickstart
 
-> **Pre-alpha:** `0.1.0` is the first release. APIs may still change before `1.0`; every breaking change is listed
-> in the [CHANGELOG](CHANGELOG.md).
+> **Pre-alpha:** the latest release is `0.2.0`. APIs may still change before `1.0`; every breaking change is listed
+> in the [CHANGELOG](CHANGELOG.md), with what to do when you upgrade.
 
 **1. Add the starter**
 
@@ -60,7 +60,7 @@ Try it yourself in two minutes, with no API key and no Docker: `./mvnw -pl examp
 <dependency>
   <groupId>io.github.dvchinx</groupId>
   <artifactId>countersign-spring-boot-starter</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 

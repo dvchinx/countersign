@@ -53,8 +53,8 @@ Pruébalo en dos minutos, sin API key y sin Docker: `./mvnw -pl examples/banking
 
 ## Inicio rápido
 
-> **Pre-alpha:** la `0.1.0` es la primera versión publicada. La API todavía puede cambiar antes de la `1.0`; cada cambio
-> incompatible aparece en el [CHANGELOG](CHANGELOG.md).
+> **Pre-alpha:** la última versión publicada es la `0.2.0`. La API todavía puede cambiar antes de la `1.0`; cada cambio
+> incompatible aparece en el [CHANGELOG](CHANGELOG.md), con lo que hay que hacer al actualizar.
 
 **1. Agrega el starter**
 
@@ -62,7 +62,7 @@ Pruébalo en dos minutos, sin API key y sin Docker: `./mvnw -pl examples/banking
 <dependency>
   <groupId>io.github.dvchinx</groupId>
   <artifactId>countersign-spring-boot-starter</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
