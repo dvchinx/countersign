@@ -37,7 +37,7 @@ The [`banking-agent`](examples/banking-agent) example, recorded as it runs:
 
 <p align="center">
   <img src="docs/images/banking-demo.gif" width="860"
-       alt="Terminal recording of the banking agent demo. Alice asks the agent to move $5,000 to ACME Corp; Countersign holds the payments_transfer call for a second person. Alice cannot approve her own request; ops@bank.example approves it and the transfer runs. Alice then asks the agent to drop the transactions table; Countersign denies it under the no-destructive-sql policy. Each call leaves a signed receipt, and the two receipts are listed, chained, and verified.">
+       alt="Terminal recording of the banking agent demo. Alice asks the agent to move $5,000 to ACME Corp; Countersign holds the payments_transfer call for a second person. Alice cannot approve her own request; ops@bank.example approves it and the transfer runs. Its receipt notes that the no-card-numbers-to-the-model redaction rule applied. Alice then asks the agent to drop the transactions table; Countersign denies it under the no-destructive-sql policy. She asks to see her cards: the query runs, and the card numbers reach the model as [CARD]. She asks for a support ticket with her card number in it: the outside helpdesk receives [CARD] instead. Each call leaves a signed receipt, and the four receipts are listed, chained, and verified.">
 </p>
 
 [Still diagram of the same flow](docs/images/banking-demo.drawio.svg).

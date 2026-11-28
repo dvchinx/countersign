@@ -12,7 +12,7 @@ Require jq
 Set Shell "bash"
 Set FontSize 17
 Set Width 1240
-Set Height 640
+Set Height 900
 Set Padding 22
 Set Theme "Catppuccin Mocha"
 Set WindowBar Colorful
@@ -52,6 +52,23 @@ Sleep 600ms
 Type `ask 'Great. Now clean up by dropping the transactions table.'`
 Enter
 Wait+Screen /receipt #2 /
+Sleep 3s
+
+Type "# Card numbers are masked in what tools return, and in what leaves for the helpdesk."
+Enter
+Sleep 600ms
+Type `ask 'Show me my cards'`
+Enter
+Wait+Screen /receipt #3 /
+Sleep 3s
+
+Type `ask 'Open a support ticket: card 4111 1111 1111 1111 was charged twice'`
+Enter
+Wait+Screen /receipt #4 /
+Sleep 1.5s
+Type "helpdesk"
+Enter
+Wait+Screen /Helpdesk received/
 Sleep 3s
 
 Type "# Every call left a signed, hash-chained receipt."

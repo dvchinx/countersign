@@ -39,7 +39,7 @@ El ejemplo [`banking-agent`](examples/banking-agent), grabado mientras se ejecut
 
 <p align="center">
   <img src="docs/images/banking-demo.gif" width="860"
-       alt="Grabación de terminal de la demo del agente bancario. Alice pide al agente mover 5.000 dólares a ACME Corp; Countersign retiene la llamada payments_transfer hasta que la apruebe una segunda persona. Alice no puede aprobar su propia petición; ops@bank.example la aprueba y la transferencia se ejecuta. Después Alice pide borrar la tabla de transacciones; Countersign lo deniega por la política no-destructive-sql. Cada llamada deja un recibo firmado, y los dos recibos se listan, encadenados, y se verifican.">
+       alt="Grabación de terminal de la demo del agente bancario. Alice pide al agente mover 5.000 dólares a ACME Corp; Countersign retiene la llamada payments_transfer hasta que la apruebe una segunda persona. Alice no puede aprobar su propia petición; ops@bank.example la aprueba y la transferencia se ejecuta. Su recibo indica que se aplicó la regla de redacción no-card-numbers-to-the-model. Después Alice pide borrar la tabla de transacciones; Countersign lo deniega por la política no-destructive-sql. Pide ver sus tarjetas: la consulta se ejecuta y los números llegan al modelo como [CARD]. Pide abrir un ticket de soporte con su número de tarjeta: el helpdesk externo recibe [CARD]. Cada llamada deja un recibo firmado, y los cuatro recibos se listan, encadenados, y se verifican.">
 </p>
 
 [Diagrama estático del mismo flujo](docs/images/banking-demo.drawio.svg).
