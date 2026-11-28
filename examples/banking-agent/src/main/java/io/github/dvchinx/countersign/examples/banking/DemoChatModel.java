@@ -46,10 +46,13 @@ final class DemoChatModel implements ChatModel {
     private static final Pattern TO =
             Pattern.compile("(?i)\\bto\\s+(?:my\\s+|the\\s+)?(.+?)(?:\\s+from\\b.*)?\\s*[.!?]*$");
     private static final Pattern BALANCE = Pattern.compile("(?i)\\bbalance\\b");
-    private static final Pattern LIST_TRANSACTIONS = Pattern.compile("(?i)\\b(show|list)\\b.*\\btransactions\\b");
+    private static final Pattern LIST = Pattern.compile("(?i)\\b(?:show|list)\\b.*\\b(transactions|cards)\\b");
+    private static final Pattern TICKET = Pattern.compile(
+            "(?is)^\\s*(?:please\\s+)?(?:open|file|raise)\\s+(?:a\\s+)?(?:support\\s+)?ticket\\b\\s*[:,-]?\\s*(.+)$");
 
     static final String HELP = "I'm the demo's scripted model. Try \"What's my checking balance?\", \"Move $5,000 from"
-            + " checking to ACME Corp\" or \"Drop the transactions table\".";
+            + " checking to ACME Corp\", \"Show me my cards\", \"Open a support ticket: …\" or \"Drop the transactions"
+            + " table\".";
 
     private final AtomicLong callIds = new AtomicLong();
 
@@ -84,6 +87,12 @@ final class DemoChatModel implements ChatModel {
             return Optional.empty();
         }
         String text = request.strip();
+        // First: a ticket's description is free text and may mention a transfer, a balance or a table.
+        Matcher ticket = TICKET.matcher(text);
+        if (ticket.matches()) {
+            return Optional.of(new PlannedCall(
+                    "support_open_ticket", Map.of("description", ticket.group(1).strip())));
+        }
         if (SQL.matcher(text).matches()) {
             return Optional.of(new PlannedCall("db_query", Map.of("query", text.replaceAll(";\\s*$", ""))));
         }
@@ -105,9 +114,12 @@ final class DemoChatModel implements ChatModel {
             String account = text.toLowerCase(Locale.ROOT).contains("savings") ? "savings" : "checking";
             return Optional.of(new PlannedCall("accounts_balance", Map.of("account", account)));
         }
-        if (LIST_TRANSACTIONS.matcher(text).find()) {
-            return Optional.of(
-                    new PlannedCall("db_query", Map.of("query", "SELECT * FROM transactions ORDER BY id DESC")));
+        Matcher list = LIST.matcher(text);
+        if (list.find()) {
+            String query = list.group(1).equalsIgnoreCase("cards")
+                    ? "SELECT * FROM cards ORDER BY id"
+                    : "SELECT * FROM transactions ORDER BY id DESC";
+            return Optional.of(new PlannedCall("db_query", Map.of("query", query)));
         }
         return Optional.empty();
     }

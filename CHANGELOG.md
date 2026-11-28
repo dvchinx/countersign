@@ -44,6 +44,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `countersign.audit.failures` for withheld results. `DecisionEvent.redactions()` and the default method
   `DecisionListener.onResultWithheld` let your own listeners see both.
 - `AuditSinkContract` checks that a sink stores a receipt's redactions.
+- The `banking-agent` example redacts card numbers. `no-card-numbers-to-the-model` masks them in every tool result,
+  so `Show me my cards` returns `number=[CARD]`, and applies to the approved $5,000 transfer too.
+  `no-card-numbers-to-the-helpdesk` masks them in the arguments of a new `support_open_ticket` tool, which stands in
+  for an outside helpdesk; `GET /helpdesk/tickets` shows what it received. The walkthrough covers both.
 
 - The signed-in Spring Security user is now the principal of each tool call, in policies (`#principal`) and receipts,
   with no code ([ADR 0014](docs/adr/0014-principal-from-spring-security.md)). A new port, `PrincipalResolver`, tells

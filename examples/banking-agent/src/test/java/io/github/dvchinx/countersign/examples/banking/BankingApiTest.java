@@ -100,6 +100,23 @@ class BankingApiTest {
     }
 
     @Test
+    void showsWhatTheOutsideHelpdeskReceived() {
+        chat("alice", "Open a support ticket: card 5555-5555-5555-4444 was declined");
+
+        assertThat(mvc.get().uri("/helpdesk/tickets"))
+                .hasStatusOk()
+                .bodyJson()
+                .extractingPath("$[0].description")
+                .isEqualTo("card [CARD] was declined");
+        assertThat(mvc.get().uri("/actuator/metrics/countersign.redactions?tag=rule:no-card-numbers-to-the-helpdesk"))
+                .hasStatusOk()
+                .bodyJson()
+                .extractingPath("$.measurements[0].value")
+                .asNumber()
+                .satisfies(count -> assertThat(count.doubleValue()).isPositive());
+    }
+
+    @Test
     void publishesDecisionMetrics() {
         chat("alice", "Drop the transactions table");
 

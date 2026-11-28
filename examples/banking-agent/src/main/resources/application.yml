@@ -31,5 +31,19 @@ countersign:
       decision: require-approval
       reason: "Transfers above $1,000 need a second person"
     - id: everyday-banking
-      tools: ["accounts_balance", "payments_transfer"]
+      tools: ["accounts_balance", "payments_transfer", "support_open_ticket"]
       decision: allow
+  # Redaction is not a decision: every rule that matches a call that runs applies, approved calls included.
+  redactors:
+    card-number:
+      pattern: "\\b\\d(?:[ -]?\\d){12,18}\\b"    # 13 to 19 digits, with optional spaces or dashes
+      replacement: "[CARD]"
+  redactions:
+    - id: no-card-numbers-to-the-helpdesk
+      tools: ["support_open_ticket"]
+      target: args                                # what the outside helpdesk receives
+      redactors: [card-number]
+    - id: no-card-numbers-to-the-model
+      tools: ["*"]
+      target: result                              # what the model gets back, from any tool
+      redactors: [card-number]

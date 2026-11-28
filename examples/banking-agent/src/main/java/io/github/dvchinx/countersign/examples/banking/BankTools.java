@@ -2,6 +2,7 @@ package io.github.dvchinx.countersign.examples.banking;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -14,6 +15,8 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.StatementCallback;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -21,7 +24,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * The agent's tools: plain Spring AI {@code @Tool} methods with no Countersign code in them.
  *
  * <p>They really change the in-memory bank. {@code db_query} runs whatever SQL it is given, so a {@code DROP TABLE}
- * would drop the table: what stops it is the {@code no-destructive-sql} policy, not the tool.
+ * would drop the table: what stops it is the {@code no-destructive-sql} policy, not the tool. In the same way, a
+ * {@code SELECT} on {@code cards} returns full card numbers; the {@code no-card-numbers-to-the-model} redaction rule
+ * masks them before the model sees the result.
  */
 @Component
 public class BankTools {
@@ -86,6 +91,32 @@ public class BankTools {
             return "Transferred " + money(cents) + " from " + from + " to " + to + ". The " + from + " balance is now "
                     + money(balance.getFirst().subtract(cents));
         });
+    }
+
+    /**
+     * Opens a ticket with the support desk, an outside service. In the demo, the ticket is stored in
+     * {@code support_tickets}, which stands in for that service: whatever this tool receives has left the bank.
+     *
+     * <p>The tool sends the description as it gets it. Card numbers the model copies into it are masked by the
+     * {@code no-card-numbers-to-the-helpdesk} redaction rule before this method is called, not here.
+     *
+     * @param description what the customer needs help with
+     * @return the ticket number and what the support desk received, as a sentence for the model
+     */
+    @Tool(
+            name = "support_open_ticket",
+            description = "Open a ticket with the bank's support desk, an outside service, on the customer's behalf")
+    public String openTicket(@ToolParam(description = "What the customer needs help with") String description) {
+        KeyHolder key = new GeneratedKeyHolder();
+        jdbc.update(
+                connection -> {
+                    PreparedStatement insert = connection.prepareStatement(
+                            "INSERT INTO support_tickets (description) VALUES (?)", new String[] {"id"});
+                    insert.setString(1, description);
+                    return insert;
+                },
+                key);
+        return "Opened support ticket #" + key.getKeyAs(Long.class) + ": " + description;
     }
 
     /**
