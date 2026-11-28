@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-28
+
 ### Breaking
 
 - `countersign-audit-jdbc` stores a new `redactions` column. `JdbcAuditSink.createSchema` (the default,
@@ -184,5 +186,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   contract and `InMemoryAuditSink.receipts()` promised chain order. Sinks now return streams in sequence order when
   read back.
 
-[Unreleased]: https://github.com/dvchinx/countersign/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/dvchinx/countersign/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/dvchinx/countersign/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dvchinx/countersign/releases/tag/v0.1.0
