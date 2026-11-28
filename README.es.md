@@ -399,22 +399,6 @@ tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envu�
 la confirmación de llamadas a herramientas de Spring AI funciona con Countersign: una llamada que una persona confirma
 sigue pasando por tus políticas, y un `deny` de una política gana al `allow` de la persona.
 
-## Hoja de ruta hacia la 0.1.0
-
-- [x] `countersign-core`: modelo, `PolicyEngine`, condiciones SpEL aisladas
-- [x] Recibos: JSON canónico, cadena SHA-256, firma Ed25519, verificación
-- [x] `GuardedToolCallback` y envoltura automática de métodos `@Tool`
-- [x] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` con un gateway que deniega al vencer el tiempo
-- [x] `@RequiresApproval`
-- [x] Starter de Spring Boot y línea de arranque en el log
-- [x] Destinos de auditoría en memoria y PostgreSQL
-- [x] Métricas y observaciones de Micrometer
-- [x] Ejemplo `banking-agent`
-- [x] GIF de demo
-- [x] Publicado en Maven Central
-
-No está previsto para la `0.1.0`: clasificadores basados en LLM, un panel web, frameworks que no sean Spring, A2A ni un servidor remoto de políticas.
-
 ## Contribuir
 
 Countersign está pensado para crecer a través de sus SPIs. Puedes hacer una contribución útil sin

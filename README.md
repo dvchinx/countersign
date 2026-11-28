@@ -387,22 +387,6 @@ wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Build
 Spring AI's tool call confirmation works with Countersign: a call a person confirms still goes through your policies,
 and a policy `deny` wins over the person's `allow`.
 
-## Roadmap to 0.1.0
-
-- [x] `countersign-core`: model, `PolicyEngine`, sandboxed SpEL conditions
-- [x] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification
-- [x] `GuardedToolCallback` and automatic wrapping of `@Tool` methods
-- [x] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with a deny-on-timeout gateway
-- [x] `@RequiresApproval`
-- [x] Spring Boot starter and startup banner line
-- [x] In-memory and PostgreSQL audit sinks
-- [x] Micrometer metrics and observations
-- [x] `banking-agent` example
-- [x] Demo GIF
-- [x] Published to Maven Central
-
-Not planned for `0.1.0`: LLM-based classifiers, a UI dashboard, non-Spring frameworks, A2A, or a remote policy server.
-
 ## Contributing
 
 Countersign is meant to grow through its SPIs. You can make a useful contribution without

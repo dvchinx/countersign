@@ -93,6 +93,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The release build waits until the Central Portal validates the bundle instead of until it is published, so slow
   publishing no longer fails the release workflow after a successful upload.
 
+### Removed
+
+- The README's "Roadmap to 0.1.0" section: everything in it shipped in 0.1.0, and the CHANGELOG lists what each
+  release adds.
+
 ## [0.1.0] - 2026-11-24
 
 ### Added
