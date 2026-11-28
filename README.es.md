@@ -39,7 +39,7 @@ El ejemplo [`banking-agent`](examples/banking-agent), grabado mientras se ejecut
 
 <p align="center">
   <img src="docs/images/banking-demo.gif" width="860"
-       alt="Grabación de terminal de la demo del agente bancario. Alice pide al agente mover 5.000 dólares a ACME Corp; Countersign retiene la llamada payments_transfer hasta que la apruebe una segunda persona. Alice no puede aprobar su propia petición; ops@bank.example la aprueba y la transferencia se ejecuta. Después Alice pide borrar la tabla de transacciones; Countersign lo deniega por la política no-destructive-sql. Cada llamada deja un recibo firmado, y los dos recibos se listan, encadenados, y se verifican.">
+       alt="Grabación de terminal de la demo del agente bancario. Alice pide al agente mover 5.000 dólares a ACME Corp; Countersign retiene la llamada payments_transfer hasta que la apruebe una segunda persona. Alice no puede aprobar su propia petición; ops@bank.example la aprueba y la transferencia se ejecuta. Su recibo indica que se aplicó la regla de redacción no-card-numbers-to-the-model. Después Alice pide borrar la tabla de transacciones; Countersign lo deniega por la política no-destructive-sql. Pide ver sus tarjetas: la consulta se ejecuta y los números llegan al modelo como [CARD]. Pide abrir un ticket de soporte con su número de tarjeta: el helpdesk externo recibe [CARD]. Cada llamada deja un recibo firmado, y los cuatro recibos se listan, encadenados, y se verifican.">
 </p>
 
 [Diagrama estático del mismo flujo](docs/images/banking-demo.drawio.svg).
@@ -398,22 +398,6 @@ tú con `ChatClient.create(model)` tiene su propio gestor de herramientas: envu�
 **Requisitos:** Java 21, Spring Boot 4.x, Spring AI 2.0.1 o superior. Probado con Spring AI 2.0 y 2.1. En la 2.1,
 la confirmación de llamadas a herramientas de Spring AI funciona con Countersign: una llamada que una persona confirma
 sigue pasando por tus políticas, y un `deny` de una política gana al `allow` de la persona.
-
-## Hoja de ruta hacia la 0.1.0
-
-- [x] `countersign-core`: modelo, `PolicyEngine`, condiciones SpEL aisladas
-- [x] Recibos: JSON canónico, cadena SHA-256, firma Ed25519, verificación
-- [x] `GuardedToolCallback` y envoltura automática de métodos `@Tool`
-- [x] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` con un gateway que deniega al vencer el tiempo
-- [x] `@RequiresApproval`
-- [x] Starter de Spring Boot y línea de arranque en el log
-- [x] Destinos de auditoría en memoria y PostgreSQL
-- [x] Métricas y observaciones de Micrometer
-- [x] Ejemplo `banking-agent`
-- [x] GIF de demo
-- [x] Publicado en Maven Central
-
-No está previsto para la `0.1.0`: clasificadores basados en LLM, un panel web, frameworks que no sean Spring, A2A ni un servidor remoto de políticas.
 
 ## Contribuir
 

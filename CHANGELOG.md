@@ -70,6 +70,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The demo GIF and its still diagram show redaction: the approved transfer's receipt lists
+  `no-card-numbers-to-the-model`, card numbers from `Show me my cards` reach the model as `[CARD]`, and a support
+  ticket reaches the outside helpdesk with `[CARD]` instead of the number. `demo.sh` prints the rules that applied to
+  each call and has a `helpdesk` command.
+
 - Redaction is an obligation on calls that run, not a fourth decision
   ([ADR 0015](docs/adr/0015-redaction.md)), so that no approval or policy order can drop it. CLAUDE.md and the
   READMEs no longer describe `REDACT` as a decision.
@@ -87,6 +92,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `CONTRIBUTING.md` describes redaction as an obligation, not a planned `REDACT` decision.
 - The release build waits until the Central Portal validates the bundle instead of until it is published, so slow
   publishing no longer fails the release workflow after a successful upload.
+
+### Removed
+
+- The README's "Roadmap to 0.1.0" section: everything in it shipped in 0.1.0, and the CHANGELOG lists what each
+  release adds.
 
 ## [0.1.0] - 2026-11-24
 

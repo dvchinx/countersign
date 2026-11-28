@@ -138,7 +138,7 @@ arguments the model proposed, card number included, which is what the policies s
 
 ## Record the demo GIF
 
-[`demo/demo.sh`](demo/demo.sh) wraps the calls above in short commands (`ask`, `approve`, `receipts`, `verify`), and
+[`demo/demo.sh`](demo/demo.sh) wraps the calls above in short commands (`ask`, `approve`, `helpdesk`, `receipts`, `verify`), and
 [`demo/banking-demo.tape`](demo/banking-demo.tape) is the [VHS](https://github.com/charmbracelet/vhs) script that
 records `docs/images/banking-demo.gif` with them. After changing the demo, re-record it from the repository root:
 

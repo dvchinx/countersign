@@ -37,7 +37,7 @@ The [`banking-agent`](examples/banking-agent) example, recorded as it runs:
 
 <p align="center">
   <img src="docs/images/banking-demo.gif" width="860"
-       alt="Terminal recording of the banking agent demo. Alice asks the agent to move $5,000 to ACME Corp; Countersign holds the payments_transfer call for a second person. Alice cannot approve her own request; ops@bank.example approves it and the transfer runs. Alice then asks the agent to drop the transactions table; Countersign denies it under the no-destructive-sql policy. Each call leaves a signed receipt, and the two receipts are listed, chained, and verified.">
+       alt="Terminal recording of the banking agent demo. Alice asks the agent to move $5,000 to ACME Corp; Countersign holds the payments_transfer call for a second person. Alice cannot approve her own request; ops@bank.example approves it and the transfer runs. Its receipt notes that the no-card-numbers-to-the-model redaction rule applied. Alice then asks the agent to drop the transactions table; Countersign denies it under the no-destructive-sql policy. She asks to see her cards: the query runs, and the card numbers reach the model as [CARD]. She asks for a support ticket with her card number in it: the outside helpdesk receives [CARD] instead. Each call leaves a signed receipt, and the four receipts are listed, chained, and verified.">
 </p>
 
 [Still diagram of the same flow](docs/images/banking-demo.drawio.svg).
@@ -386,22 +386,6 @@ wrap it with `GuardedToolCallingManager.guard(...)`, or inject `ChatClient.Build
 **Requirements:** Java 21, Spring Boot 4.x, Spring AI 2.0.1 or later. Tested on Spring AI 2.0 and 2.1. On 2.1,
 Spring AI's tool call confirmation works with Countersign: a call a person confirms still goes through your policies,
 and a policy `deny` wins over the person's `allow`.
-
-## Roadmap to 0.1.0
-
-- [x] `countersign-core`: model, `PolicyEngine`, sandboxed SpEL conditions
-- [x] Receipts: canonical JSON, SHA-256 chain, Ed25519 signing, verification
-- [x] `GuardedToolCallback` and automatic wrapping of `@Tool` methods
-- [x] `ALLOW` / `DENY` / `REQUIRE_APPROVAL` with a deny-on-timeout gateway
-- [x] `@RequiresApproval`
-- [x] Spring Boot starter and startup banner line
-- [x] In-memory and PostgreSQL audit sinks
-- [x] Micrometer metrics and observations
-- [x] `banking-agent` example
-- [x] Demo GIF
-- [x] Published to Maven Central
-
-Not planned for `0.1.0`: LLM-based classifiers, a UI dashboard, non-Spring frameworks, A2A, or a remote policy server.
 
 ## Contributing
 

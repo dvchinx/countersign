@@ -4,6 +4,8 @@
 #   demo_start                                       # starts the app in the background
 #   ask "Move \$5,000 from checking to ACME Corp."   # Alice talks to the agent
 #   approve ops@bank.example                         # someone else approves
+#   ask 'Open a support ticket: card 4111 1111 1111 1111 was charged twice'
+#   helpdesk                                         # what the outside helpdesk received
 #   receipts && verify
 #   demo_stop
 #
@@ -15,7 +17,7 @@ DEMO_URL="http://localhost:${DEMO_PORT}"
 DEMO_LOG="${TMPDIR:-/tmp}/countersign-banking-demo.log"
 _demo_reply=""
 
-_dim=$'\e[2m' _bold=$'\e[1m' _cyan=$'\e[36m' _green=$'\e[32m' _red=$'\e[31m' _yellow=$'\e[33m' _off=$'\e[0m'
+_dim=$'\e[2m' _bold=$'\e[1m' _cyan=$'\e[36m' _green=$'\e[32m' _red=$'\e[31m' _yellow=$'\e[33m' _magenta=$'\e[35m' _off=$'\e[0m'
 
 demo_start() {
     local root
@@ -87,10 +89,16 @@ approve() {
     _demo_reply=""
 }
 
+# What the outside helpdesk received for the latest ticket, read from its table rather than through the agent.
+helpdesk() {
+    curl -s "$DEMO_URL/helpdesk/tickets" | jq -r --arg y "$_yellow" --arg b "$_bold" --arg o "$_off" '
+        if length == 0 then "No tickets yet" else "\($y)\($b)Helpdesk received ▸\($o)\($y) \(.[0].description)\($o)" end'
+}
+
 # Every receipt of this run: what was decided, under which policy, and how each one links to the one before.
 receipts() {
     curl -s "$DEMO_URL/receipts" | jq -r --arg d "$_dim" --arg o "$_off" '.[] |
-        "#\(.sequence)  \(.tool | .[0:18] | . + " " * (18 - length)) \(.decision | . + " " * (17 - length))"
+        "#\(.sequence)  \(.tool | .[0:20] | . + " " * (20 - length)) \(.decision | . + " " * (17 - length))"
         + "\(.matchedPolicies[0] // "default" | . + " " * (24 - length))"
         + "\($d)\(.hash[0:4])…\(.hash[-4:])  prev \(.previousHash[0:4])…\(.previousHash[-4:])  Ed25519\($o)"'
 }
@@ -104,9 +112,11 @@ verify() {
 _answer() {
     echo "${_cyan}${_bold}Agent ▸${_off}${_cyan} $(jq -r .answer "$1")${_off}"
     rm -f "$1"
-    curl -s "$DEMO_URL/receipts" | jq -r --arg g "$_green" --arg r "$_red" --arg d "$_dim" --arg o "$_off" 'last |
+    curl -s "$DEMO_URL/receipts" | jq -r --arg g "$_green" --arg r "$_red" --arg m "$_magenta" --arg d "$_dim" \
+        --arg o "$_off" 'last |
         (if .decision == "DENY" or (.approval != null and .approval != "APPROVED") then $r else $g end) as $c
         | "\($c)● \(.decision)\(if .approval then " → \(.approval)" else "" end)"
           + " · policy \(.matchedPolicies[0] // "default")\($o)"
-          + "\($d) · signed receipt #\(.sequence) \(.hash[0:4])…\(.hash[-4:])\($o)"'
+          + "\($d) · signed receipt #\(.sequence) \(.hash[0:4])…\(.hash[-4:])\($o)",
+          (select((.redactions // []) | length > 0) | "\($m)  ↳ redacted by \(.redactions | join(", "))\($o)")'
 }
