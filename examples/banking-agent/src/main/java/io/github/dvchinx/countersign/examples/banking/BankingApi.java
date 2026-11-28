@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +23,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The demo's HTTP API: talk to the agent, answer approvals, read and verify receipts.
+ * The demo's HTTP API: talk to the agent, answer approvals, read and verify receipts, and see what the outside
+ * helpdesk received.
  *
  * <p>The caller is named in an {@code X-User} header so the demo needs no login. A real application takes the
  * identity from Spring Security instead; the approver's name ends up in a signed receipt, so it must not be something
@@ -36,18 +38,21 @@ class BankingApi {
     private final InMemoryAuditSink receipts;
     private final ReceiptChain chain;
     private final ReceiptVerifier verifier;
+    private final JdbcTemplate jdbc;
 
     BankingApi(
             BankingAgent agent,
             InMemoryApprovalGateway approvals,
             InMemoryAuditSink receipts,
             ReceiptChain chain,
-            ReceiptVerifier verifier) {
+            ReceiptVerifier verifier,
+            JdbcTemplate jdbc) {
         this.agent = agent;
         this.approvals = approvals;
         this.receipts = receipts;
         this.chain = chain;
         this.verifier = verifier;
+        this.jdbc = jdbc;
     }
 
     record ChatRequest(String message, @Nullable String conversationId) {}
@@ -74,6 +79,8 @@ class BankingApi {
     }
 
     record Rejection(@Nullable String reason) {}
+
+    record Ticket(long id, String description) {}
 
     record Verification(
             boolean valid,
@@ -135,6 +142,17 @@ class BankingApi {
                         invalid.index(),
                         "receipt #" + invalid.sequence() + ": " + invalid.problem());
         };
+    }
+
+    /**
+     * The tickets the outside helpdesk received, newest first. Read straight from its table, not through the agent, so
+     * what shows here is what left the bank: no redaction rule applies to this endpoint.
+     */
+    @GetMapping("/helpdesk/tickets")
+    List<Ticket> tickets() {
+        return jdbc.query(
+                "SELECT id, description FROM support_tickets ORDER BY id DESC",
+                (row, n) -> new Ticket(row.getLong("id"), row.getString("description")));
     }
 
     private interface Answer {

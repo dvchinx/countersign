@@ -123,6 +123,8 @@ class BankingAgentTest {
             assertThat(receipt.approval()).isEqualTo(ApprovalOutcome.APPROVED);
             assertThat(receipt.approver()).isEqualTo("ops@bank.example");
             assertThat(receipt.principal()).isEqualTo("alice");
+            // Redaction is an obligation, not a decision: an approved call is redacted like any other.
+            assertThat(receipt.redactions()).containsExactly("no-card-numbers-to-the-model");
         });
     }
 
@@ -153,6 +155,7 @@ class BankingAgentTest {
             assertThat(receipt.tool()).isEqualTo("db_query");
             assertThat(receipt.decision()).isEqualTo(Decision.Type.DENY);
             assertThat(receipt.matchedPolicies()).containsExactly("no-destructive-sql");
+            assertThat(receipt.redactions()).isEmpty();
         });
     }
 
@@ -171,6 +174,37 @@ class BankingAgentTest {
     void letsTheAgentReadTheDatabase() {
         assertThat(ask("Show me the latest transactions")).contains("to_account=");
         assertThat(lastReceipt().matchedPolicies()).containsExactly("sql-reads");
+    }
+
+    @Test
+    void masksCardNumbersBeforeTheModelSeesThem() {
+        String answer = ask("Show me my cards");
+
+        assertThat(answer)
+                .contains("kind=debit, number=[CARD], expires=09/29", "kind=credit, number=[CARD], expires=03/28")
+                .doesNotContain("4111", "5555");
+        assertThat(lastReceipt()).satisfies(receipt -> {
+            assertThat(receipt.decision()).isEqualTo(Decision.Type.ALLOW);
+            assertThat(receipt.matchedPolicies()).containsExactly("sql-reads");
+            assertThat(receipt.redactions()).containsExactly("no-card-numbers-to-the-model");
+        });
+    }
+
+    @Test
+    void masksACardNumberBeforeItReachesTheOutsideHelpdesk() {
+        String answer =
+                ask("Open a support ticket: my debit card 4111 1111 1111 1111 was charged twice at Corner Cafe");
+
+        String received =
+                jdbc.queryForObject("SELECT description FROM support_tickets ORDER BY id DESC LIMIT 1", String.class);
+        assertThat(received).isEqualTo("my debit card [CARD] was charged twice at Corner Cafe");
+        assertThat(answer).startsWith("Opened support ticket #").endsWith(received);
+        assertThat(lastReceipt()).satisfies(receipt -> {
+            assertThat(receipt.tool()).isEqualTo("support_open_ticket");
+            assertThat(receipt.matchedPolicies()).containsExactly("everyday-banking");
+            assertThat(receipt.redactions())
+                    .containsExactly("no-card-numbers-to-the-helpdesk", "no-card-numbers-to-the-model");
+        });
     }
 
     @Test

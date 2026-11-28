@@ -8,8 +8,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 /**
- * Flagship demo: an agent that reads balances and moves money, with large transfers sent for human approval and
- * destructive SQL refused. Every tool call leaves a signed receipt.
+ * Flagship demo: an agent that reads balances and moves money, with large transfers sent for human approval,
+ * destructive SQL refused, and card numbers masked before they reach the model or an outside helpdesk. Every tool call
+ * leaves a signed receipt.
  *
  * <p>Run it with {@code ./mvnw -pl examples/banking-agent spring-boot:run} and follow the example's README.
  */

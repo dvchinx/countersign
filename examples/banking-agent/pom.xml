@@ -12,7 +12,7 @@
 
     <artifactId>countersign-example-banking-agent</artifactId>
     <name>Countersign Example: Banking Agent</name>
-    <description>Flagship demo: an agent that reads balances and moves money, with large transfers sent for human approval.</description>
+    <description>Flagship demo: an agent that reads balances and moves money, with large transfers sent for human approval and card numbers redacted.</description>
 
     <dependencies>
         <dependency>

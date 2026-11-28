@@ -36,6 +36,22 @@ class DemoChatModelTest {
     }
 
     @Test
+    void listsCardsAndTransactions() {
+        assertThat(DemoChatModel.plan("Show me my cards"))
+                .contains(new PlannedCall("db_query", Map.of("query", "SELECT * FROM cards ORDER BY id")));
+        assertThat(DemoChatModel.plan("List my transactions"))
+                .contains(new PlannedCall("db_query", Map.of("query", "SELECT * FROM transactions ORDER BY id DESC")));
+    }
+
+    @Test
+    void opensATicketWithTheDescriptionAsWritten() {
+        assertThat(DemoChatModel.plan("Open a support ticket: I can't pay ACME Corp $50 from checking, drop it?"))
+                .contains(new PlannedCall(
+                        "support_open_ticket",
+                        Map.of("description", "I can't pay ACME Corp $50 from checking, drop it?")));
+    }
+
+    @Test
     void callsNoToolForAnythingElse() {
         assertThat(DemoChatModel.plan("Tell me a joke")).isEmpty();
     }
